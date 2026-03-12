@@ -1,0 +1,57 @@
+name: ttapp
+description: "AI Automated College Timetable Management System"
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.10.8
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State Management
+  flutter_riverpod: ^2.5.1
+
+  # Navigation
+  go_router: ^14.2.7
+
+  # Networking
+  dio: ^5.4.3+1
+
+  # Local Storage
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  flutter_secure_storage: ^9.2.2
+
+  # Firebase
+  firebase_core: ^3.3.0
+  firebase_messaging: ^15.1.0
+  flutter_local_notifications: ^17.2.2
+
+  # Export
+  pdf: ^3.10.8
+  printing: ^5.12.0
+
+  # UI & Utilities
+  cupertino_icons: ^1.0.8
+  google_fonts: ^6.2.1
+  intl: ^0.19.0
+  shimmer: ^3.0.0
+  cached_network_image: ^3.3.1
+  image_picker: ^1.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0
+  hive_generator: ^2.0.1
+  build_runner: ^2.4.11
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+
