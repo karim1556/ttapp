@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:printing/printing.dart';
+import 'dart:convert';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../models/lecture_assignment_model.dart';
 import '../../../models/timetable_day_model.dart';
@@ -30,6 +34,7 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen>
   int? _selectedBranch;
   int? _selectedSemester;
   String? _selectedDivision;
+  bool _dragEditMode = false;
 
   static const _branches = {1: 'CS', 2: 'IT', 3: 'EXTC', 4: 'Mech'};
   static const _semesters = [1, 2, 3, 4, 5, 6, 7, 8];
@@ -41,7 +46,6 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen>
     'Wednesday',
     'Thursday',
     'Friday',
-    'Saturday',
   ];
 
   @override
@@ -50,7 +54,7 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen>
 
     // Default to today's tab
     final dayOfWeek = DateTime.now().weekday; // 1=Mon … 7=Sun
-    _selectedDayIndex = (dayOfWeek <= 6) ? dayOfWeek - 1 : 0;
+    _selectedDayIndex = (dayOfWeek <= 5) ? dayOfWeek - 1 : 0;
 
     _tabController = TabController(
       length: _days.length,
@@ -80,6 +84,7 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen>
   @override
   Widget build(BuildContext context) {
     final timetableState = ref.watch(timetableProvider);
+    final isAdmin = ref.watch(isAdminProvider);
     final isLoading = timetableState.status == TimetableStatus.loading &&
         timetableState.weeklyTimetable.isEmpty;
 
@@ -87,10 +92,36 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen>
       appBar: AppBar(
         title: const Text('Weekly Timetable'),
         actions: [
+          if (isAdmin)
+            IconButton(
+              icon: Icon(
+                _dragEditMode ? Icons.pan_tool_alt_rounded : Icons.open_with_rounded,
+              ),
+              tooltip: _dragEditMode
+                  ? 'Disable Drag & Drop Editing'
+                  : 'Enable Drag & Drop Editing',
+              onPressed: () {
+                setState(() => _dragEditMode = !_dragEditMode);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      _dragEditMode
+                          ? 'Drag mode enabled. Long-press a lecture and drop into another slot.'
+                          : 'Drag mode disabled.',
+                    ),
+                  ),
+                );
+              },
+            ),
           IconButton(
             icon: const Icon(Icons.picture_as_pdf_outlined),
             tooltip: 'Export PDF',
             onPressed: _exportPdf,
+          ),
+          IconButton(
+            icon: const Icon(Icons.table_view_outlined),
+            tooltip: 'Export Excel (CSV)',
+            onPressed: _exportExcelCsv,
           ),
           IconButton(
             icon: const Icon(Icons.refresh_outlined),
@@ -111,6 +142,24 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen>
       ),
       body: Column(
         children: [
+          if (isAdmin && _dragEditMode)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              color: AppColors.warning.withOpacity(0.12),
+              child: const Row(
+                children: [
+                  Icon(Icons.touch_app_outlined, color: AppColors.warning),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Drag mode is ON: long-press any lecture card and drop it on another slot to move/swap.',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           _FilterBar(
             selectedBranch: _selectedBranch,
             selectedSemester: _selectedSemester,
@@ -152,6 +201,9 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen>
                             timetableDay: dayData,
                             onSlotTap: (slot) =>
                                 _showLectureDetail(context, slot),
+                            enableDragDrop: isAdmin && _dragEditMode,
+                            onMoveLecture: (lecture, targetSlot) =>
+                                _moveLectureToSlot(lecture, targetSlot),
                           );
                         }).toList(),
                       ),
@@ -207,9 +259,9 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen>
       }
       return;
     }
-    final divLabel = _selectedDivision != null ? '_Div${_selectedDivision}' : '';
+    final divLabel = _selectedDivision != null ? '_Div$_selectedDivision' : '';
     final branchLabel = _selectedBranch != null ? '_${_branches[_selectedBranch]}' : '';
-    final semLabel = _selectedSemester != null ? '_Sem${_selectedSemester}' : '';
+    final semLabel = _selectedSemester != null ? '_Sem$_selectedSemester' : '';
     await Printing.layoutPdf(
       name: 'Timetable$branchLabel$semLabel$divLabel',
       onLayout: (_) => buildTimetablePdf(
@@ -219,6 +271,79 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen>
         division: _selectedDivision,
       ),
     );
+  }
+
+  Future<void> _exportExcelCsv() async {
+    final timetableState = ref.read(timetableProvider);
+    if (timetableState.weeklyTimetable.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No timetable data to export. Load a timetable first.')),
+        );
+      }
+      return;
+    }
+
+    final csv = buildTimetableCsv(
+      timetableState.weeklyTimetable,
+      branchId: _selectedBranch,
+      semester: _selectedSemester,
+      division: _selectedDivision,
+    );
+
+    final divLabel = _selectedDivision != null ? '_Div$_selectedDivision' : '';
+    final branchLabel = _selectedBranch != null ? '_${_branches[_selectedBranch]}' : '';
+    final semLabel = _selectedSemester != null ? '_Sem$_selectedSemester' : '';
+    final fileName = 'Timetable$branchLabel$semLabel$divLabel.csv';
+
+    try {
+      final directory = await getTemporaryDirectory();
+      final file = File('${directory.path}/$fileName');
+      await file.writeAsBytes(utf8.encode(csv), flush: true);
+
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        text: 'Timetable export (Excel-compatible CSV)',
+        subject: 'Timetable Export',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to export CSV: $e')),
+      );
+    }
+  }
+
+  Future<void> _moveLectureToSlot(
+    LectureAssignmentModel lecture,
+    TimeSlotModel targetSlot,
+  ) async {
+    if (lecture.timeTableDetailedId == targetSlot.id) return;
+
+    final ok = await ref.read(timetableProvider.notifier).moveLecture(
+          lectureId: lecture.id,
+          targetSlotId: targetSlot.id,
+          swap: true,
+        );
+
+    if (!mounted) return;
+
+    if (ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Lecture moved successfully.')),
+      );
+      _loadTimetable();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            ref.read(timetableProvider).errorMessage ??
+                'Failed to move lecture. Check conflicts and try again.',
+          ),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
   }
 }
 
@@ -315,7 +440,7 @@ class _EditLectureDialogState extends ConsumerState<_EditLectureDialog> {
                   .map((s) => DropdownMenuItem(
                         value: s.subjectCode,
                         child: Text(
-                          '${s.subjectName ?? s.subjectCode} (${s.subjectCode})',
+                          '${s.subjectName} (${s.subjectCode})',
                           overflow: TextOverflow.ellipsis,
                         ),
                       ))
@@ -331,7 +456,9 @@ class _EditLectureDialogState extends ConsumerState<_EditLectureDialog> {
               items: faculty
                   .map((f) => DropdownMenuItem(
                         value: f.facultyId,
-                        child: Text(f.name ?? 'Faculty ${f.facultyId}'),
+                        child: Text(
+                          f.name.isNotEmpty ? f.name : 'Faculty ${f.facultyId}',
+                        ),
                       ))
                   .toList(),
               onChanged: (v) => setState(() => _selectedFacultyId = v),
@@ -483,11 +610,15 @@ class _DayTimetableView extends StatelessWidget {
   final String dayName;
   final TimetableDay? timetableDay;
   final void Function(TimeSlotModel) onSlotTap;
+  final bool enableDragDrop;
+  final void Function(LectureAssignmentModel, TimeSlotModel)? onMoveLecture;
 
   const _DayTimetableView({
     required this.dayName,
     required this.timetableDay,
     required this.onSlotTap,
+    this.enableDragDrop = false,
+    this.onMoveLecture,
   });
 
   @override
@@ -507,14 +638,82 @@ class _DayTimetableView extends StatelessWidget {
         final slot = timetableDay!.slots[index];
         final colorIndex = index % AppColors.subjectColors.length;
         final hasLecture = slot.lectures.isNotEmpty;
+        final lecture = hasLecture ? slot.lectures.first : null;
+
+        final baseCard = TimetableGridWidget(
+          slot: slot,
+          color: hasLecture ? AppColors.subjectColors[colorIndex] : null,
+          onTap: hasLecture ? () => onSlotTap(slot) : null,
+        );
+
+        Widget card = baseCard;
+
+        if (enableDragDrop) {
+          card = DragTarget<LectureAssignmentModel>(
+            onWillAcceptWithDetails: (details) {
+              final incoming = details.data;
+              return incoming.timeTableDetailedId != slot.id;
+            },
+            onAcceptWithDetails: (details) {
+              onMoveLecture?.call(details.data, slot);
+            },
+            builder: (context, candidates, _) {
+              final isHighlighted = candidates.isNotEmpty;
+
+              Widget visual = AnimatedContainer(
+                duration: const Duration(milliseconds: 120),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: isHighlighted
+                      ? Border.all(color: AppColors.warning, width: 2)
+                      : null,
+                ),
+                child: baseCard,
+              );
+
+              if (lecture != null) {
+                visual = LongPressDraggable<LectureAssignmentModel>(
+                  data: lecture,
+                  feedback: Material(
+                    color: Colors.transparent,
+                    child: Container(
+                      width: 260,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Colors.black26,
+                            blurRadius: 8,
+                            offset: Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        '${lecture.subjectName ?? lecture.subjectCode ?? 'Lecture'} • ${lecture.facultyName ?? ''}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                  childWhenDragging: Opacity(opacity: 0.45, child: visual),
+                  child: visual,
+                );
+              }
+
+              return visual;
+            },
+          );
+        }
 
         return Padding(
           padding: const EdgeInsets.only(bottom: 8),
-          child: TimetableGridWidget(
-            slot: slot,
-            color: hasLecture ? AppColors.subjectColors[colorIndex] : null,
-            onTap: hasLecture ? () => onSlotTap(slot) : null,
-          ),
+          child: card,
         );
       },
     );

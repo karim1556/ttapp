@@ -7,7 +7,7 @@ class ApiEndpoints {
   static const String refreshToken = '/auth/refresh';
 
   // Profile
-  static const String profile = '/auth/profile';
+  static const String profile = '/profile';
   static const String updateProfile = '/auth/profile/update';
 
   // Timetable
@@ -15,8 +15,12 @@ class ApiEndpoints {
   static const String timetableWeekly = '/timetable/weekly';
   static const String timetableToday = '/timetable/today';
   static const String timetableGenerate = '/timetable/generate';
+  static const String timetableGenerateAll = '/timetable/generate-all';
   static const String timetableUpdateSlot = '/timetable/slots';
+  static const String timetableMoveSlot = '/timetable/slots';
   static const String timetableById = '/timetable'; // append /:id
+  static const String timetableRoomWeekly = '/timetable/room'; // append /:room/weekly
+  static const String timetableClassroomUsageReport = '/timetable/reports/classroom-usage';
 
   // Time Slots
   static const String timeSlots = '/timetable/slots';
@@ -24,7 +28,7 @@ class ApiEndpoints {
   // Faculty
   static const String faculty = '/faculty';
   static const String facultyById = '/faculty'; // append /:id
-  static const String facultyTimetable = '/faculty/timetable';
+  static const String facultyTimetable = '/timetable/faculty';
 
   // Subjects
   static const String subjects = '/subjects';
@@ -32,7 +36,7 @@ class ApiEndpoints {
 
   // Constraints
   static const String constraints = '/constraints';
-  static const String constraintsByFaculty = '/constraints/faculty'; // append /:id
+  static const String constraintsByFaculty = '/constraints'; // append /:id
 
   // Holidays
   static const String holidays = '/holidays';

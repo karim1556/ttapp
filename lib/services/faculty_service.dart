@@ -15,8 +15,8 @@ class FacultyService {
     final response = await _apiClient.get(
       ApiEndpoints.faculty,
       queryParameters: {
-        if (branchId != null) 'branch_id': branchId,
-        if (departId != null) 'depart_id': departId,
+        if (branchId != null) 'branchId': branchId,
+        if (departId != null) 'departId': departId,
       },
     );
     final body = response.data as Map<String, dynamic>;

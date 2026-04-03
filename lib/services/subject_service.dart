@@ -16,9 +16,9 @@ class SubjectService {
     final response = await _apiClient.get(
       ApiEndpoints.subjects,
       queryParameters: {
-        if (branchId != null) 'branch_id': branchId,
+        if (branchId != null) 'branchId': branchId,
         if (semester != null) 'semester': semester,
-        if (acadYear != null) 'acad_year': acadYear,
+        if (acadYear != null) 'acadYear': acadYear,
       },
     );
     final body = response.data as Map<String, dynamic>;

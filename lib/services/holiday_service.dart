@@ -12,7 +12,7 @@ class HolidayService {
     final response = await _apiClient.get(
       ApiEndpoints.holidays,
       queryParameters: {
-        if (year != null) 'year': year,
+        if (year != null) 'acadYear': year,
       },
     );
     final body = response.data as Map<String, dynamic>;

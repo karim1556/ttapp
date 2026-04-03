@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../constants/app_constants.dart';
@@ -52,13 +53,18 @@ class ApiClient {
     _dio.interceptors.addAll([
       _AuthInterceptor(_storageService),
       _ErrorInterceptor(),
-      LogInterceptor(
-        requestBody: true,
-        responseBody: true,
-        error: true,
-        logPrint: (object) => print('[DIO] $object'),
-      ),
     ]);
+
+    if (kDebugMode) {
+      _dio.interceptors.add(
+        LogInterceptor(
+          requestBody: true,
+          responseBody: true,
+          error: true,
+          logPrint: (object) => debugPrint('[DIO] $object'),
+        ),
+      );
+    }
   }
 
   Future<Response<T>> get<T>(

@@ -69,7 +69,16 @@ class TimetableService {
     );
     final body = response.data as Map<String, dynamic>;
     final raw = body['data'];
-    final List<dynamic> days = raw is List ? raw : [];
+    final List<dynamic> days = raw is List
+        ? raw
+        : raw is Map<String, dynamic>
+            ? raw.entries
+                .map((e) => {
+                      'dayName': e.key,
+                      ...(e.value as Map<String, dynamic>),
+                    })
+                .toList()
+            : [];
     return days
         .map((e) => TimetableDay.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -84,6 +93,47 @@ class TimetableService {
     return list
         .map((e) => TimetableModel.fromJson(e as Map<String, dynamic>))
         .toList();
+  }
+
+  /// Fetch weekly timetable for a specific room.
+  Future<List<TimetableDay>> fetchRoomWeeklyTimetable(
+    String roomNumber, {
+    int? branchId,
+    int? semester,
+    String? division,
+  }) async {
+    final response = await _apiClient.get(
+      '${ApiEndpoints.timetableRoomWeekly}/${Uri.encodeComponent(roomNumber)}/weekly',
+      queryParameters: {
+        if (branchId != null) 'branchId': branchId,
+        if (semester != null) 'sem': semester,
+        if (division != null) 'division': division,
+      },
+    );
+
+    final data = response.data as Map<String, dynamic>;
+    final List<dynamic> rawList = data['data'] as List<dynamic>? ?? [];
+    return rawList
+        .map((e) => TimetableDay.fromApiEntry(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Fetch room occupancy analytics for classroom usage reporting.
+  Future<List<Map<String, dynamic>>> fetchClassroomUsageReport() async {
+    final response = await _apiClient.get(ApiEndpoints.timetableClassroomUsageReport);
+    final body = response.data as Map<String, dynamic>;
+    final data = body['data'];
+    if (data is Map<String, dynamic>) {
+      final rooms = data['rooms'];
+      if (rooms is List) {
+        return rooms
+            .map((e) => (e as Map).map(
+                  (k, v) => MapEntry(k.toString(), v),
+                ))
+            .toList();
+      }
+    }
+    return const [];
   }
 
   /// Get time slots for a given timetable entry.
@@ -118,6 +168,25 @@ class TimetableService {
     return response.data as Map<String, dynamic>;
   }
 
+  /// Admin action: generate all classes in one optimization run.
+  Future<Map<String, dynamic>> generateAllTimetables({
+    required String academicYear,
+    List<String>? divisions,
+    List<int>? branchIds,
+    List<int>? semesters,
+  }) async {
+    final response = await _apiClient.post(
+      ApiEndpoints.timetableGenerateAll,
+      data: {
+        'academicYear': academicYear,
+        if (divisions != null && divisions.isNotEmpty) 'divisions': divisions,
+        if (branchIds != null && branchIds.isNotEmpty) 'branchIds': branchIds,
+        if (semesters != null && semesters.isNotEmpty) 'semesters': semesters,
+      },
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
   /// Update a lecture assignment (admin/editor).
   Future<void> updateLectureSlot({
     required int slotId,
@@ -126,6 +195,21 @@ class TimetableService {
     await _apiClient.put(
       '${ApiEndpoints.timetableUpdateSlot}/$slotId',
       data: updates,
+    );
+  }
+
+  /// Move/swap a lecture to another slot (used by drag-drop editing).
+  Future<void> moveLectureSlot({
+    required int lectureId,
+    required int targetSlotId,
+    bool swap = true,
+  }) async {
+    await _apiClient.put(
+      '${ApiEndpoints.timetableMoveSlot}/$lectureId/move',
+      data: {
+        'targetSlotId': targetSlotId,
+        'swap': swap,
+      },
     );
   }
 }

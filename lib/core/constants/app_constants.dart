@@ -4,7 +4,7 @@ class AppConstants {
   // Base URL — update to match your backend
   // static const String baseUrl = 'http://10.0.2.2:3000/api'; // Android emulator
   // static const String baseUrl = 'http://localhost:3000/api'; // iOS simulator / Chrome / macOS
-  static const String baseUrl = 'http://172.16.13.253:3000/api'; // Physical Android device (LAN)
+  static const String baseUrl = 'http://192.168.0.117:3000/api'; // Physical Android device (LAN)
   // ↑ This is now just the default fallback. Change server URL in app Profile → Server URL.
   // static const String baseUrl = 'https://your-production-url.com/api';
 
@@ -28,7 +28,6 @@ class AppConstants {
     'Wednesday',
     'Thursday',
     'Friday',
-    'Saturday',
   ];
 
   static const List<String> daysShort = [
@@ -37,7 +36,6 @@ class AppConstants {
     'Wed',
     'Thu',
     'Fri',
-    'Sat',
   ];
 
   // Holiday types

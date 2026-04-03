@@ -15,6 +15,7 @@ import '../features/admin/screens/manage_subjects_screen.dart';
 import '../features/copo/screens/copo_screen.dart';
 import '../features/admin/screens/manage_rooms_screen.dart';
 import '../features/admin/screens/manage_timeslots_screen.dart';
+import '../features/admin/screens/room_reports_screen.dart';
 import '../widgets/app_shell.dart';
 
 // Route names
@@ -33,12 +34,10 @@ class AppRoutes {
   static const String copo = '/admin/copo';
   static const String manageRooms = '/admin/rooms';
   static const String manageTimeslots = '/admin/timeslots';
+  static const String roomReports = '/admin/rooms/reports';
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final authNotifier = ref.watch(authProvider.notifier);
-  final authState = ref.watch(authProvider);
-
   return GoRouter(
     initialLocation: AppRoutes.splash,
     refreshListenable: _AuthChangeNotifier(ref),
@@ -124,6 +123,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.manageRooms,
         builder: (context, state) => const ManageRoomsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.roomReports,
+        builder: (context, state) => const RoomReportsScreen(),
       ),
       GoRoute(
         path: AppRoutes.manageTimeslots,

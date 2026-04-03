@@ -2,7 +2,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/timetable_day_model.dart';
 import '../services/timetable_service.dart';
 import '../services/storage_service.dart';
-import 'dart:convert';
 
 enum TimetableStatus { initial, loading, loaded, error }
 
@@ -179,6 +178,53 @@ class TimetableNotifier extends StateNotifier<TimetableState> {
       return true;
     } on Exception catch (e) {
       state = state.copyWith(errorMessage: e.toString());
+      return false;
+    }
+  }
+
+  Future<bool> moveLecture({
+    required int lectureId,
+    required int targetSlotId,
+    bool swap = true,
+  }) async {
+    try {
+      await _timetableService.moveLectureSlot(
+        lectureId: lectureId,
+        targetSlotId: targetSlotId,
+        swap: swap,
+      );
+      return true;
+    } on Exception catch (e) {
+      state = state.copyWith(errorMessage: e.toString());
+      return false;
+    }
+  }
+
+  Future<bool> generateAllTimetables({
+    required String academicYear,
+  }) async {
+    state = state.copyWith(isGenerating: true, generateMessage: null);
+    try {
+      final result = await _timetableService.generateAllTimetables(
+        academicYear: academicYear,
+      );
+
+      final message = result['message']?.toString() ??
+          'All classes timetable generated successfully!';
+
+      state = state.copyWith(
+        isGenerating: false,
+        generateMessage: message,
+      );
+
+      // Reload unfiltered weekly data so admin can inspect fresh output.
+      await loadWeeklyTimetable();
+      return true;
+    } on Exception catch (e) {
+      state = state.copyWith(
+        isGenerating: false,
+        generateMessage: 'Generation failed: ${e.toString()}',
+      );
       return false;
     }
   }

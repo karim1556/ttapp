@@ -7,13 +7,7 @@ import '../../../providers/auth_provider.dart';
 import '../../../providers/faculty_provider.dart';
 import '../../../providers/subject_provider.dart';
 import '../../../providers/timetable_provider.dart';
-import '../../../widgets/empty_state_widget.dart';
 import '../../../widgets/loading_overlay_widget.dart';
-
-// Internal state for generation form
-final _selectedBranchProvider = StateProvider<int?>((ref) => null);
-final _selectedSemesterProvider = StateProvider<int?>((ref) => null);
-final _selectedDivisionProvider = StateProvider<String?>((ref) => null);
 
 class AdminPanelScreen extends ConsumerStatefulWidget {
   const AdminPanelScreen({super.key});
@@ -74,6 +68,7 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen> {
             const SizedBox(height: 12),
             _GenerateTimetableCard(
               onGenerate: _handleGenerate,
+              onGenerateAll: _handleGenerateAll,
             ),
 
             const SizedBox(height: 24),
@@ -123,6 +118,14 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen> {
               subtitle: 'Classrooms, labs and their capacities',
               color: Colors.teal,
               onTap: () => context.push(AppRoutes.manageRooms),
+            ),
+            const SizedBox(height: 10),
+            _AdminActionCard(
+              icon: Icons.domain_verification_outlined,
+              title: 'Room Timetable & Usage',
+              subtitle: 'View room-wise timetable and occupancy analytics',
+              color: Colors.blueGrey,
+              onTap: () => context.push(AppRoutes.roomReports),
             ),
             const SizedBox(height: 10),
             _AdminActionCard(
@@ -226,6 +229,14 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen> {
           academicYear: academicYear,
         );
   }
+
+  Future<void> _handleGenerateAll({
+    required String academicYear,
+  }) async {
+    await ref.read(timetableProvider.notifier).generateAllTimetables(
+          academicYear: academicYear,
+        );
+  }
 }
 
 class _StatsRow extends StatelessWidget {
@@ -324,8 +335,14 @@ class _GenerateTimetableCard extends StatefulWidget {
     required String division,
     required String academicYear,
   }) onGenerate;
+  final Future<void> Function({
+    required String academicYear,
+  }) onGenerateAll;
 
-  const _GenerateTimetableCard({required this.onGenerate});
+  const _GenerateTimetableCard({
+    required this.onGenerate,
+    required this.onGenerateAll,
+  });
 
   @override
   State<_GenerateTimetableCard> createState() => _GenerateTimetableCardState();
@@ -460,6 +477,20 @@ class _GenerateTimetableCardState extends State<_GenerateTimetableCard> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 52,
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.auto_fix_high_outlined),
+                label: const Text(
+                  'Generate All Classes (Single Click)',
+                  style: TextStyle(fontSize: 15),
+                ),
+                onPressed: () => widget.onGenerateAll(
+                  academicYear: _academicYear,
                 ),
               ),
             ),
