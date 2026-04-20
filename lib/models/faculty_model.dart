@@ -25,6 +25,7 @@ class FacultyModel {
   final String? cv;
   final String email;
   final int? branchId;
+  final int? weeklyWorkHours;
   final int? status;
 
   FacultyModel({
@@ -54,6 +55,7 @@ class FacultyModel {
     this.cv,
     required this.email,
     this.branchId,
+    this.weeklyWorkHours,
     this.status,
   });
 
@@ -87,6 +89,7 @@ class FacultyModel {
       cv: json['cv']?.toString(),
       email: json['email']?.toString() ?? '',
       branchId: _parseInt(json['branch_id']),
+      weeklyWorkHours: _parseInt(json['weekly_work_hours']),
       status: _parseInt(json['status']),
     );
   }
@@ -119,6 +122,7 @@ class FacultyModel {
       'cv': cv,
       'email': email,
       'branch_id': branchId,
+      'weekly_work_hours': weeklyWorkHours,
       'status': status,
     };
   }

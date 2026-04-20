@@ -8,28 +8,32 @@ enum HolidayStatus { initial, loading, loaded, error }
 class HolidayState {
   final HolidayStatus status;
   final List<HolidayModel> holidays;
+  final List<HolidayModel> upcomingApiHolidays;
   final String? errorMessage;
 
   const HolidayState({
     this.status = HolidayStatus.initial,
     this.holidays = const [],
+    this.upcomingApiHolidays = const [],
     this.errorMessage,
   });
 
   HolidayState copyWith({
     HolidayStatus? status,
     List<HolidayModel>? holidays,
+    List<HolidayModel>? upcomingApiHolidays,
     String? errorMessage,
   }) {
     return HolidayState(
       status: status ?? this.status,
       holidays: holidays ?? this.holidays,
+      upcomingApiHolidays: upcomingApiHolidays ?? this.upcomingApiHolidays,
       errorMessage: errorMessage,
     );
   }
 
   List<HolidayModel> get upcomingHolidays {
-    final now = DateTime.now();
+    if (upcomingApiHolidays.isNotEmpty) return upcomingApiHolidays;
     return holidays.where((h) => h.isUpcoming).toList()
       ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
   }
@@ -56,7 +60,7 @@ class HolidayNotifier extends StateNotifier<HolidayState> {
   final StorageService _storageService;
 
   HolidayNotifier(this._holidayService, this._storageService)
-      : super(const HolidayState());
+    : super(const HolidayState());
 
   Future<void> loadHolidays({String? year}) async {
     state = state.copyWith(status: HolidayStatus.loading);
@@ -66,14 +70,27 @@ class HolidayNotifier extends StateNotifier<HolidayState> {
       if (cached != null && cached.isNotEmpty) {
         final cachedHolidays = cached
             .map((e) => HolidayModel.fromJson(e))
+            .where((h) => h.parsedDate != null)
             .toList();
+        cachedHolidays.sort((a, b) => a.dateTime.compareTo(b.dateTime));
         state = state.copyWith(
           status: HolidayStatus.loaded,
           holidays: cachedHolidays,
+          upcomingApiHolidays:
+              cachedHolidays.where((h) => h.isUpcoming).toList()
+                ..sort((a, b) => a.dateTime.compareTo(b.dateTime)),
         );
       }
 
       final holidays = await _holidayService.fetchAllHolidays(year: year);
+
+      List<HolidayModel> upcoming;
+      try {
+        upcoming = await _holidayService.fetchUpcomingHolidays(limit: 30);
+      } catch (_) {
+        upcoming = holidays.where((h) => h.isUpcoming).toList()
+          ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
+      }
 
       await _storageService.saveHolidayCache(
         holidays.map((e) => e.toJson()).toList(),
@@ -82,6 +99,7 @@ class HolidayNotifier extends StateNotifier<HolidayState> {
       state = state.copyWith(
         status: HolidayStatus.loaded,
         holidays: holidays,
+        upcomingApiHolidays: upcoming,
       );
     } on Exception catch (e) {
       state = state.copyWith(
@@ -94,8 +112,9 @@ class HolidayNotifier extends StateNotifier<HolidayState> {
   }
 }
 
-final holidayProvider =
-    StateNotifierProvider<HolidayNotifier, HolidayState>((ref) {
+final holidayProvider = StateNotifierProvider<HolidayNotifier, HolidayState>((
+  ref,
+) {
   final holidayService = ref.watch(holidayServiceProvider);
   final storageService = ref.watch(storageServiceProvider);
   return HolidayNotifier(holidayService, storageService);

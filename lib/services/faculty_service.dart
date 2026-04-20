@@ -33,6 +33,23 @@ class FacultyService {
     return FacultyModel.fromJson(body['data'] as Map<String, dynamic>);
   }
 
+  Future<FacultyModel> fetchMyFacultyProfile() async {
+    final response = await _apiClient.get(ApiEndpoints.facultyMe);
+    final body = response.data as Map<String, dynamic>;
+    return FacultyModel.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  Future<FacultyModel> updateMyWeeklyWorkHours(int weeklyWorkHours) async {
+    final response = await _apiClient.put(
+      ApiEndpoints.facultyMyWorkHours,
+      data: {
+        'weeklyWorkHours': weeklyWorkHours,
+      },
+    );
+    final body = response.data as Map<String, dynamic>;
+    return FacultyModel.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
   /// Returns a map with keys: 'faculty' (FacultyModel) and 'credentials' (Map?) if new login was created.
   Future<Map<String, dynamic>> createFaculty(Map<String, dynamic> facultyData) async {
     final response = await _apiClient.post(

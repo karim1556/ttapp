@@ -16,6 +16,8 @@ import '../features/copo/screens/copo_screen.dart';
 import '../features/admin/screens/manage_rooms_screen.dart';
 import '../features/admin/screens/manage_timeslots_screen.dart';
 import '../features/admin/screens/room_reports_screen.dart';
+import '../features/notifications/screens/notifications_screen.dart';
+import '../features/substitutions/screens/substitutions_screen.dart';
 import '../widgets/app_shell.dart';
 
 // Route names
@@ -35,6 +37,8 @@ class AppRoutes {
   static const String manageRooms = '/admin/rooms';
   static const String manageTimeslots = '/admin/timeslots';
   static const String roomReports = '/admin/rooms/reports';
+  static const String substitutions = '/substitutions';
+  static const String notifications = '/notifications';
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -44,12 +48,16 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final currentState = ref.read(authProvider);
       final isLoggedIn = currentState.isAuthenticated;
-      final isLoading = currentState.status == AuthStatus.initial ||
-          currentState.status == AuthStatus.loading;
       final isLoginPage = state.matchedLocation == AppRoutes.login;
       final isSplash = state.matchedLocation == AppRoutes.splash;
+      final isBootstrapping = currentState.status == AuthStatus.initial;
+      final isRestoringOnSplash =
+          isSplash && currentState.status == AuthStatus.loading;
 
-      if (isLoading) return AppRoutes.splash;
+      // Keep splash only while app is deciding whether a stored session exists.
+      if (isBootstrapping || isRestoringOnSplash) {
+        return isSplash ? null : AppRoutes.splash;
+      }
       if (!isLoggedIn && !isLoginPage) return AppRoutes.login;
       if (isLoggedIn && (isLoginPage || isSplash)) return AppRoutes.home;
       return null;
@@ -68,39 +76,33 @@ final routerProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(
             path: AppRoutes.home,
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: DashboardScreen(),
-            ),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: DashboardScreen()),
           ),
           GoRoute(
             path: AppRoutes.timetable,
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: TimetableScreen(),
-            ),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: TimetableScreen()),
           ),
           GoRoute(
             path: AppRoutes.today,
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: TodayScreen(),
-            ),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: TodayScreen()),
           ),
           GoRoute(
             path: AppRoutes.holidays,
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: HolidaysScreen(),
-            ),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: HolidaysScreen()),
           ),
           GoRoute(
             path: AppRoutes.profile,
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: ProfileScreen(),
-            ),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: ProfileScreen()),
           ),
           GoRoute(
             path: AppRoutes.adminPanel,
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: AdminPanelScreen(),
-            ),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: AdminPanelScreen()),
           ),
         ],
       ),
@@ -132,12 +134,17 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.manageTimeslots,
         builder: (context, state) => const ManageTimeslotsScreen(),
       ),
-    ],
-    errorBuilder: (context, state) => Scaffold(
-      body: Center(
-        child: Text('Page not found: ${state.error}'),
+      GoRoute(
+        path: AppRoutes.substitutions,
+        builder: (context, state) => const SubstitutionsScreen(),
       ),
-    ),
+      GoRoute(
+        path: AppRoutes.notifications,
+        builder: (context, state) => const NotificationsScreen(),
+      ),
+    ],
+    errorBuilder: (context, state) =>
+        Scaffold(body: Center(child: Text('Page not found: ${state.error}'))),
   );
 });
 
@@ -146,7 +153,7 @@ class _AuthChangeNotifier extends ChangeNotifier {
   late final ProviderSubscription<AuthState> _subscription;
 
   _AuthChangeNotifier(this._ref) {
-    _subscription = _ref.listen<AuthState>(authProvider, (_, __) {
+    _subscription = _ref.listen<AuthState>(authProvider, (previous, next) {
       notifyListeners();
     });
   }
@@ -178,16 +185,16 @@ class _SplashScreen extends StatelessWidget {
             Text(
               'TT Manager',
               style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               'AI-Powered Timetable System',
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: Colors.white70,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyLarge?.copyWith(color: Colors.white70),
             ),
             const SizedBox(height: 48),
             const CircularProgressIndicator(

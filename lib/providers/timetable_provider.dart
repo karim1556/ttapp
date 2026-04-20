@@ -202,11 +202,19 @@ class TimetableNotifier extends StateNotifier<TimetableState> {
 
   Future<bool> generateAllTimetables({
     required String academicYear,
+    List<String>? divisions,
+    List<int>? branchIds,
+    List<int>? semesters,
+    String? termType,
   }) async {
     state = state.copyWith(isGenerating: true, generateMessage: null);
     try {
       final result = await _timetableService.generateAllTimetables(
         academicYear: academicYear,
+        divisions: divisions,
+        branchIds: branchIds,
+        semesters: semesters,
+        termType: termType,
       );
 
       final message = result['message']?.toString() ??

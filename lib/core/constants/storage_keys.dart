@@ -2,9 +2,12 @@ class StorageKeys {
   StorageKeys._();
 
   static const String authToken = 'auth_token';
+  static const String authTokenFallback = 'auth_token_fallback';
   static const String userData = 'user_data';
   static const String timetableCache = 'timetable_cache';
   static const String holidayCache = 'holiday_cache';
+  static const String substitutionRecords = 'substitution_records';
+  static const String notificationInbox = 'notification_inbox';
   static const String fcmToken = 'fcm_token';
   static const String lastSyncTime = 'last_sync_time';
   static const String selectedBranch = 'selected_branch';

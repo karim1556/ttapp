@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/api/api_client.dart';
 import '../core/api/api_endpoints.dart';
@@ -25,8 +27,18 @@ class AuthService {
     final userJson = data['user'] as Map<String, dynamic>? ?? data;
     final user = UserModel.fromJson(userJson).copyWith(token: token);
 
-    await _storageService.saveToken(token);
-    await _storageService.saveUserData(user.toJson());
+    // Persist session data, but do not block successful login forever if device
+    // keystore/Hive is temporarily slow.
+    try {
+      await _storageService
+          .saveToken(token)
+          .timeout(const Duration(seconds: 3));
+      await _storageService
+          .saveUserData(user.toJson())
+          .timeout(const Duration(seconds: 3));
+    } catch (_) {
+      // Keep login successful; subsequent API calls can still use in-memory state.
+    }
 
     return user;
   }

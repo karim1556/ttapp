@@ -7,6 +7,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'core/constants/storage_keys.dart';
 import 'core/theme/app_theme.dart';
 import 'navigation/app_router.dart';
+import 'providers/auth_provider.dart';
 import 'services/notification_service.dart';
 
 @pragma('vm:entry-point')
@@ -46,9 +47,20 @@ class TtApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
+    final authState = ref.watch(authProvider);
 
     // Initialize notification service once
-    ref.watch(notificationServiceProvider);
+    final notificationService = ref.watch(notificationServiceProvider);
+
+    ref.listen<AuthState>(authProvider, (previous, next) {
+      if (next.isAuthenticated && next.user != null) {
+        notificationService.registerDeviceForUser(next.user!);
+      }
+    });
+
+    if (authState.isAuthenticated && authState.user != null) {
+      notificationService.registerDeviceForUser(authState.user!);
+    }
 
     return MaterialApp.router(
       title: 'TT App',

@@ -39,6 +39,42 @@ class LectureAssignmentModel {
   bool get isExtraLecture => isExtra == 1;
   bool get isSubstitution => lectOnBehalf == 1;
 
+  LectureAssignmentModel copyWith({
+    int? id,
+    int? timeTableDetailedId,
+    String? typeOfLecture,
+    String? subjectCode,
+    int? facultyId,
+    String? batch,
+    int? createdBy,
+    String? createdAt,
+    String? updatedAt,
+    int? isExtra,
+    int? lectOnBehalf,
+    String? reason,
+    String? roomNumber,
+    String? subjectName,
+    String? facultyName,
+  }) {
+    return LectureAssignmentModel(
+      id: id ?? this.id,
+      timeTableDetailedId: timeTableDetailedId ?? this.timeTableDetailedId,
+      typeOfLecture: typeOfLecture ?? this.typeOfLecture,
+      subjectCode: subjectCode ?? this.subjectCode,
+      facultyId: facultyId ?? this.facultyId,
+      batch: batch ?? this.batch,
+      createdBy: createdBy ?? this.createdBy,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      isExtra: isExtra ?? this.isExtra,
+      lectOnBehalf: lectOnBehalf ?? this.lectOnBehalf,
+      reason: reason ?? this.reason,
+      roomNumber: roomNumber ?? this.roomNumber,
+      subjectName: subjectName ?? this.subjectName,
+      facultyName: facultyName ?? this.facultyName,
+    );
+  }
+
   factory LectureAssignmentModel.fromJson(Map<String, dynamic> json) {
     return LectureAssignmentModel(
       id: _parseInt(json['id']) ?? 0,
@@ -51,7 +87,8 @@ class LectureAssignmentModel {
       createdAt: json['createdAt']?.toString(),
       updatedAt: json['updatedAt']?.toString(),
       isExtra: _parseInt(json['is_extra']),
-      lectOnBehalf: _parseInt(json['lect_on_dehalf']),
+        lectOnBehalf:
+          _parseInt(json['lect_on_behalf']) ?? _parseInt(json['lect_on_dehalf']),
       reason: json['reason']?.toString(),
       roomNumber: json['room_number']?.toString(),
       subjectName: json['subject_name']?.toString(),

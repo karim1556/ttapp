@@ -12,6 +12,8 @@ class SubjectModel {
   final int? numModules;
   final String? professorAssign;
   final int totalCredits;
+  final int? weeklyHours;
+  final int? semesterHours;
   final int? maxMarks;
   final int? isOral;
   final int? isPractical;
@@ -34,6 +36,8 @@ class SubjectModel {
 
     this.professorAssign,
     required this.totalCredits,
+    this.weeklyHours,
+    this.semesterHours,
     this.maxMarks,
     this.isOral,
     this.isPractical,
@@ -64,6 +68,8 @@ class SubjectModel {
       professorAssign: json['professorAssign']?.toString() ??
           json['professor_assign']?.toString(),
       totalCredits: _parseInt(json['totalcredits']) ?? _parseInt(json['totalCredits']) ?? 0,
+        weeklyHours: _parseInt(json['weekly_hours']) ?? _parseInt(json['weeklyHours']) ?? _parseInt(json['totalcredits']),
+        semesterHours: _parseInt(json['semester_hours']) ?? _parseInt(json['semesterHours']),
       maxMarks: _parseInt(json['max_marks']) ?? _parseInt(json['maxMarks']),
       isOral: _parseInt(json['isoral']) ?? _parseInt(json['isOral']),
       isPractical: _parseInt(json['ispractical']) ?? _parseInt(json['isPractical']),
@@ -88,6 +94,8 @@ class SubjectModel {
       'num_modules': numModules,
       'professor_assign': professorAssign,
       'totalcredits': totalCredits,
+      'weekly_hours': weeklyHours,
+      'semester_hours': semesterHours,
       'max_marks': maxMarks,
       'isoral': isOral,
       'ispractical': isPractical,

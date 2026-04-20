@@ -8,19 +8,31 @@ class HolidayService {
 
   HolidayService(this._apiClient);
 
+  List<HolidayModel> _normalizeAndSort(List<dynamic> raw) {
+    final parsed = raw
+        .whereType<Map>()
+        .map((e) => HolidayModel.fromJson(Map<String, dynamic>.from(e)))
+        .where((h) => h.parsedDate != null)
+        .toList();
+
+    parsed.sort((a, b) => a.dateTime.compareTo(b.dateTime));
+    return parsed;
+  }
+
   Future<List<HolidayModel>> fetchAllHolidays({String? year}) async {
+    final queryParameters = <String, dynamic>{};
+    if (year != null && year.isNotEmpty) {
+      queryParameters['acadYear'] = year;
+    }
+
     final response = await _apiClient.get(
       ApiEndpoints.holidays,
-      queryParameters: {
-        if (year != null) 'acadYear': year,
-      },
+      queryParameters: queryParameters.isEmpty ? null : queryParameters,
     );
     final body = response.data as Map<String, dynamic>;
     final raw = body['data'];
     final List<dynamic> list = raw is List ? raw : [];
-    return list
-        .map((e) => HolidayModel.fromJson(e as Map<String, dynamic>))
-        .toList();
+    return _normalizeAndSort(list);
   }
 
   Future<List<HolidayModel>> fetchUpcomingHolidays({int limit = 10}) async {
@@ -31,27 +43,31 @@ class HolidayService {
     final body = response.data as Map<String, dynamic>;
     final raw = body['data'];
     final List<dynamic> list = raw is List ? raw : [];
-    return list
-        .map((e) => HolidayModel.fromJson(e as Map<String, dynamic>))
-        .toList();
+    return _normalizeAndSort(list);
   }
 
   /// Check if a given DateTime is a holiday.
   /// Matches against the cached/fetched holiday list.
   bool isHoliday(DateTime date, List<HolidayModel> holidays) {
+    final target = DateTime(date.year, date.month, date.day);
     return holidays.any((h) {
-      final d = DateTime.tryParse(h.date);
+      final d = h.parsedDate;
       if (d == null) return false;
-      return d.year == date.year && d.month == date.month && d.day == date.day;
+      return d.year == target.year &&
+          d.month == target.month &&
+          d.day == target.day;
     });
   }
 
   HolidayModel? getHolidayForDate(DateTime date, List<HolidayModel> holidays) {
+    final target = DateTime(date.year, date.month, date.day);
     try {
       return holidays.firstWhere((h) {
-        final d = DateTime.tryParse(h.date);
+        final d = h.parsedDate;
         if (d == null) return false;
-        return d.year == date.year && d.month == date.month && d.day == date.day;
+        return d.year == target.year &&
+            d.month == target.month &&
+            d.day == target.day;
       });
     } catch (_) {
       return null;

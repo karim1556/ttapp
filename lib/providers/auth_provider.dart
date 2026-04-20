@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
@@ -9,18 +11,15 @@ class AuthState {
   final UserModel? user;
   final String? errorMessage;
 
-  const AuthState({
-    required this.status,
-    this.user,
-    this.errorMessage,
-  });
+  const AuthState({required this.status, this.user, this.errorMessage});
 
   const AuthState.initial()
-      : status = AuthStatus.initial,
-        user = null,
-        errorMessage = null;
+    : status = AuthStatus.initial,
+      user = null,
+      errorMessage = null;
 
-  bool get isAuthenticated => status == AuthStatus.authenticated && user != null;
+  bool get isAuthenticated =>
+      status == AuthStatus.authenticated && user != null;
   bool get isLoading => status == AuthStatus.loading;
 
   AuthState copyWith({
@@ -44,9 +43,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> _checkStoredSession() async {
-    state = state.copyWith(status: AuthStatus.loading);
+    state = const AuthState(status: AuthStatus.loading);
     try {
-      final user = await _authService.getStoredUser();
+      final user = await _authService.getStoredUser().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => null,
+      );
       if (user != null) {
         state = AuthState(status: AuthStatus.authenticated, user: user);
       } else {
@@ -58,15 +60,20 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> login({required String email, required String password}) async {
-    state = state.copyWith(status: AuthStatus.loading, errorMessage: null);
+    state = AuthState(status: AuthStatus.loading, user: state.user);
     try {
-      final user = await _authService.login(email: email, password: password);
+      final user = await _authService
+          .login(email: email, password: password)
+          .timeout(const Duration(seconds: 35));
       state = AuthState(status: AuthStatus.authenticated, user: user);
-    } catch (e) {
-      state = AuthState(
+    } on TimeoutException {
+      state = const AuthState(
         status: AuthStatus.error,
-        errorMessage: e.toString(),
+        errorMessage:
+            'Login timed out. Check server URL and network, then try again.',
       );
+    } catch (e) {
+      state = AuthState(status: AuthStatus.error, errorMessage: e.toString());
     }
   }
 
@@ -77,7 +84,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   void clearError() {
     if (state.status == AuthStatus.error) {
-      state = state.copyWith(status: AuthStatus.unauthenticated);
+      state = AuthState(status: AuthStatus.unauthenticated, user: state.user);
     }
   }
 }

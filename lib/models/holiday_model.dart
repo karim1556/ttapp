@@ -13,18 +13,46 @@ class HolidayModel {
     this.description,
   });
 
-  DateTime get dateTime => DateTime.tryParse(date) ?? DateTime.now();
+  /// Parsed as a date-only value in local time (time portion removed).
+  DateTime? get parsedDate {
+    final trimmed = date.trim();
+    if (trimmed.isEmpty) return null;
+
+    final iso = DateTime.tryParse(trimmed);
+    if (iso != null) {
+      final local = iso.toLocal();
+      return DateTime(local.year, local.month, local.day);
+    }
+
+    final parts = trimmed.split('/');
+    if (parts.length == 3) {
+      final day = int.tryParse(parts[0]);
+      final month = int.tryParse(parts[1]);
+      final year = int.tryParse(parts[2]);
+      if (day != null && month != null && year != null) {
+        return DateTime(year, month, day);
+      }
+    }
+
+    return null;
+  }
+
+  DateTime get dateTime => parsedDate ?? DateTime.fromMillisecondsSinceEpoch(0);
 
   bool get isToday {
-    final today = DateTime.now();
-    final d = dateTime;
+    final d = parsedDate;
+    if (d == null) return false;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
     return d.year == today.year && d.month == today.month && d.day == today.day;
   }
 
   bool get isUpcoming {
-    final today = DateTime.now();
-    final d = dateTime;
-    return d.isAfter(DateTime(today.year, today.month, today.day));
+    final d = parsedDate;
+    if (d == null) return false;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    return !d.isBefore(today);
   }
 
   factory HolidayModel.fromJson(Map<String, dynamic> json) {

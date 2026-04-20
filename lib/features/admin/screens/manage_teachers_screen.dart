@@ -121,6 +121,9 @@ class _ManageTeachersScreenState extends ConsumerState<ManageTeachersScreen> {
     final contactCtrl = TextEditingController(text: existing?.contact);
     final qualCtrl = TextEditingController(text: existing?.qualification);
     final roleCtrl = TextEditingController(text: existing?.role);
+    final weeklyHoursCtrl = TextEditingController(
+      text: (existing?.weeklyWorkHours ?? 18).toString(),
+    );
     final clgIdCtrl = TextEditingController(text: existing?.facultyClgId);
     final panCtrl = TextEditingController(text: existing?.panNo);
     final aadharCtrl = TextEditingController(text: existing?.aadharCard);
@@ -226,6 +229,23 @@ class _ManageTeachersScreenState extends ConsumerState<ManageTeachersScreen> {
                       decoration: const InputDecoration(
                           labelText: 'Role',
                           hintText: 'e.g. Professor, Asst. Professor'),
+                    ),
+                    const SizedBox(height: 10),
+
+                    TextFormField(
+                      controller: weeklyHoursCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Weekly Work Hours *',
+                        hintText: 'e.g. 18',
+                      ),
+                      keyboardType: TextInputType.number,
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return 'Required';
+                        final parsed = int.tryParse(v.trim());
+                        if (parsed == null) return 'Must be a number';
+                        if (parsed < 1 || parsed > 60) return 'Allowed range: 1-60';
+                        return null;
+                      },
                     ),
                     const SizedBox(height: 10),
 
@@ -459,6 +479,7 @@ class _ManageTeachersScreenState extends ConsumerState<ManageTeachersScreen> {
                   'current_address': currAddrCtrl.text.trim(),
                   'alternate_mobile': altMobileCtrl.text.trim(),
                   'experience_details': expCtrl.text.trim(),
+                  'weekly_work_hours': int.parse(weeklyHoursCtrl.text.trim()),
                   'ftype_id': ftypeId,
                   'shift_id': shiftId,
                   'previlage': privilege,
@@ -648,6 +669,21 @@ class _TeacherCard extends StatelessWidget {
                         _branchName(faculty.branchId!),
                         style: const TextStyle(
                             color: AppColors.secondary, fontSize: 10, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                  if (faculty.weeklyWorkHours != null) ...[
+                    const SizedBox(width: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        '${faculty.weeklyWorkHours} hr/wk',
+                        style: const TextStyle(
+                            color: AppColors.warning, fontSize: 10, fontWeight: FontWeight.w600),
                       ),
                     ),
                   ],

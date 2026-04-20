@@ -8,8 +8,12 @@ import '../../../models/timetable_day_model.dart';
 import '../../../navigation/app_router.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/holiday_provider.dart';
+import '../../../providers/notification_center_provider.dart';
+import '../../../providers/substitution_provider.dart';
 import '../../../providers/timetable_provider.dart';
 import '../../../widgets/lecture_card_widget.dart';
+import '../../substitutions/utils/substitution_overlay.dart';
+import '../../timetable/utils/slot_grouping.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -30,6 +34,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   void _loadData() {
     ref.read(timetableProvider.notifier).loadWeeklyTimetable();
     ref.read(holidayProvider.notifier).loadHolidays();
+    ref.read(substitutionProvider.notifier).loadForDate(DateTime.now());
   }
 
   @override
@@ -37,6 +42,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final user = ref.watch(currentUserProvider);
     final timetableState = ref.watch(timetableProvider);
     final holidayState = ref.watch(holidayProvider);
+    final substitutionState = ref.watch(substitutionProvider);
+    final notificationState = ref.watch(notificationCenterProvider);
     final isAdmin = ref.watch(isAdminProvider);
     final isFaculty = ref.watch(isFacultyProvider);
 
@@ -47,15 +54,51 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final todayHoliday = holidayState.todayHoliday;
 
     // Get today's lectures from weekly timetable
-    final todayDay = _getTodayFromWeekly(timetableState.weeklyTimetable, dayName);
+    final todayDay = _getTodayFromWeekly(
+      timetableState.weeklyTimetable,
+      dayName,
+    );
+    final substitutedSlots = todayDay == null
+        ? const <TimeSlotModel>[]
+        : applyApprovedSubstitutionsToSlots(
+            slots: todayDay.slots,
+            substitutions: substitutionState.approvedForDate(now),
+            date: now,
+          );
+    final visibleTodaySlots = todayDay == null
+        ? const <TimeSlotModel>[]
+        : collapseConsecutiveLabSlots(substitutedSlots);
 
     // Next upcoming lecture
-    final nextLecture = _getNextLecture(todayDay);
+    final nextLecture = _getNextLecture(visibleTodaySlots);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('TT Manager'),
         actions: [
+          IconButton(
+            onPressed: () => context.push(AppRoutes.notifications),
+            tooltip: 'Notifications',
+            icon: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(Icons.notifications_outlined),
+                if (notificationState.unreadCount > 0)
+                  Positioned(
+                    right: -1,
+                    top: -1,
+                    child: Container(
+                      width: 9,
+                      height: 9,
+                      decoration: const BoxDecoration(
+                        color: AppColors.error,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.refresh_outlined),
             onPressed: _loadData,
@@ -69,7 +112,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           padding: const EdgeInsets.all(16),
           children: [
             // Greeting card
-            _buildGreetingCard(context, user?.email ?? 'User', dayName, dateFormatted),
+            _buildGreetingCard(
+              context,
+              user?.email ?? 'User',
+              dayName,
+              dateFormatted,
+            ),
             const SizedBox(height: 16),
 
             // Holiday banner
@@ -85,10 +133,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ],
 
             // Quick action cards
-            Text(
-              'Quick Access',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
+            Text('Quick Access', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 12),
 
             GridView.count(
@@ -161,10 +206,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 ],
               ),
               const SizedBox(height: 8),
-              if (todayDay.slots.isEmpty)
+              if (visibleTodaySlots.isEmpty)
                 _buildEmptyTodayCard(context)
               else
-                ...todayDay.slots.take(3).map(
+                ...visibleTodaySlots
+                    .take(3)
+                    .map(
                       (slot) => Padding(
                         padding: const EdgeInsets.only(bottom: 8),
                         child: LectureCardWidget(slot: slot),
@@ -190,9 +237,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 ],
               ),
               const SizedBox(height: 8),
-              ...holidayState.upcomingHolidays.take(3).map(
-                    (h) => _HolidayChip(holiday: h),
-                  ),
+              ...holidayState.upcomingHolidays
+                  .take(3)
+                  .map((h) => _HolidayChip(holiday: h)),
             ],
 
             const SizedBox(height: 24),
@@ -212,10 +259,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     }
   }
 
-  TimeSlotModel? _getNextLecture(TimetableDay? todayDay) {
-    if (todayDay == null) return null;
+  TimeSlotModel? _getNextLecture(List<TimeSlotModel> slots) {
+    if (slots.isEmpty) return null;
     final now = DateTime.now();
-    for (final slot in todayDay.slots) {
+    for (final slot in slots) {
       final slotTime = DateTime(
         now.year,
         now.month,
@@ -231,13 +278,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   Widget _buildGreetingCard(
-      BuildContext context, String email, String day, String date) {
+    BuildContext context,
+    String email,
+    String day,
+    String date,
+  ) {
     final hour = DateTime.now().hour;
     final greeting = hour < 12
         ? 'Good Morning!'
         : hour < 17
-            ? 'Good Afternoon!'
-            : 'Good Evening!';
+        ? 'Good Afternoon!'
+        : 'Good Evening!';
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -284,23 +335,25 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    const Icon(Icons.calendar_today,
-                        color: Colors.white70, size: 14),
+                    const Icon(
+                      Icons.calendar_today,
+                      color: Colors.white70,
+                      size: 14,
+                    ),
                     const SizedBox(width: 6),
                     Text(
                       '$day, $date',
-                      style: const TextStyle(color: Colors.white70, fontSize: 13),
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13,
+                      ),
                     ),
                   ],
                 ),
               ],
             ),
           ),
-          const Icon(
-            Icons.school_rounded,
-            color: Colors.white30,
-            size: 64,
-          ),
+          const Icon(Icons.school_rounded, color: Colors.white30, size: 64),
         ],
       ),
     );
@@ -316,8 +369,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.celebration_rounded,
-              color: AppColors.holidayText, size: 28),
+          const Icon(
+            Icons.celebration_rounded,
+            color: AppColors.holidayText,
+            size: 28,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -333,7 +389,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 ),
                 Text(
                   name,
-                  style: const TextStyle(color: AppColors.holidayText, fontSize: 13),
+                  style: const TextStyle(
+                    color: AppColors.holidayText,
+                    fontSize: 13,
+                  ),
                 ),
               ],
             ),
@@ -353,14 +412,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         ),
         child: Row(
           children: [
-            const Icon(Icons.check_circle_outline, color: AppColors.success, size: 24),
+            const Icon(
+              Icons.check_circle_outline,
+              color: AppColors.success,
+              size: 24,
+            ),
             const SizedBox(width: 12),
             Text(
               'No more lectures today',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(color: AppColors.success),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.success),
             ),
           ],
         ),
@@ -381,15 +443,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         children: [
           Row(
             children: [
-              const Icon(Icons.arrow_forward_ios_rounded,
-                  size: 14, color: AppColors.primary),
+              const Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 14,
+                color: AppColors.primary,
+              ),
               const SizedBox(width: 6),
               Text(
                 'Next Lecture',
-                style: Theme.of(context)
-                    .textTheme
-                    .labelLarge
-                    ?.copyWith(color: AppColors.primary),
+                style: Theme.of(
+                  context,
+                ).textTheme.labelLarge?.copyWith(color: AppColors.primary),
               ),
             ],
           ),
@@ -399,9 +463,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               Text(
                 slot.timeRangeDisplay,
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(width: 12),
               if (lecture != null)
@@ -409,8 +473,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   child: Text(
                     lecture.subjectName ?? lecture.subjectCode ?? 'Subject',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: AppColors.textPrimary,
-                        ),
+                      color: AppColors.textPrimary,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -421,7 +485,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             const SizedBox(height: 4),
             Row(
               children: [
-                const Icon(Icons.room_outlined, size: 14, color: AppColors.textSecondary),
+                const Icon(
+                  Icons.room_outlined,
+                  size: 14,
+                  color: AppColors.textSecondary,
+                ),
                 const SizedBox(width: 4),
                 Text(
                   'Room ${lecture!.roomNumber}',
@@ -429,8 +497,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 ),
                 if (lecture.facultyName != null) ...[
                   const SizedBox(width: 12),
-                  const Icon(Icons.person_outlined,
-                      size: 14, color: AppColors.textSecondary),
+                  const Icon(
+                    Icons.person_outlined,
+                    size: 14,
+                    color: AppColors.textSecondary,
+                  ),
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
@@ -460,8 +531,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.event_busy_outlined,
-                size: 40, color: AppColors.textSecondary),
+            const Icon(
+              Icons.event_busy_outlined,
+              size: 40,
+              color: AppColors.textSecondary,
+            ),
             const SizedBox(height: 8),
             Text(
               'No lectures scheduled today',
@@ -529,9 +603,9 @@ class _HolidayChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dateStr = DateFormat('d MMM yyyy').format(
-      DateTime.tryParse(holiday.date) ?? DateTime.now(),
-    );
+    final dateStr = DateFormat(
+      'd MMM yyyy',
+    ).format(DateTime.tryParse(holiday.date) ?? DateTime.now());
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -549,8 +623,11 @@ class _HolidayChip extends StatelessWidget {
               color: AppColors.error.withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(Icons.event_outlined,
-                color: AppColors.error, size: 20),
+            child: const Icon(
+              Icons.event_outlined,
+              color: AppColors.error,
+              size: 20,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -584,8 +661,11 @@ class _HolidayChip extends StatelessWidget {
               ),
               child: Text(
                 holiday.type,
-                style:
-                    const TextStyle(color: AppColors.error, fontSize: 11, fontWeight: FontWeight.w500),
+                style: const TextStyle(
+                  color: AppColors.error,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
         ],

@@ -174,6 +174,7 @@ class TimetableService {
     List<String>? divisions,
     List<int>? branchIds,
     List<int>? semesters,
+    String? termType,
   }) async {
     final response = await _apiClient.post(
       ApiEndpoints.timetableGenerateAll,
@@ -182,6 +183,7 @@ class TimetableService {
         if (divisions != null && divisions.isNotEmpty) 'divisions': divisions,
         if (branchIds != null && branchIds.isNotEmpty) 'branchIds': branchIds,
         if (semesters != null && semesters.isNotEmpty) 'semesters': semesters,
+        if (termType != null && termType.isNotEmpty) 'termType': termType,
       },
     );
     return response.data as Map<String, dynamic>;

@@ -28,6 +28,8 @@ class ApiEndpoints {
   // Faculty
   static const String faculty = '/faculty';
   static const String facultyById = '/faculty'; // append /:id
+  static const String facultyMe = '/faculty/me';
+  static const String facultyMyWorkHours = '/faculty/me/work-hours';
   static const String facultyTimetable = '/timetable/faculty';
 
   // Subjects
@@ -57,6 +59,10 @@ class ApiEndpoints {
 
   // Notification
   static const String saveFcmToken = '/notifications/token';
+
+  // Substitutions (day-only overrides)
+  static const String substitutions = '/substitutions';
+  static const String substitutionsPreview = '/substitutions/preview';
 
   // COPO
   static const String copo = '/copo';

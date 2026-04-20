@@ -345,21 +345,25 @@ pw.Widget _legendItem({required PdfColor color, required String label}) {
 }
 
 String _pdfCellContent(TimeSlotModel slot) {
-  final lec = slot.lectures.first;
-  final subject = (lec.subjectName ?? lec.subjectCode ?? 'Untitled').trim();
-  final faculty = (lec.facultyName ?? '').trim();
-  final room = (lec.roomNumber ?? '').trim();
-  final isLab = lec.isLabLecture || (lec.typeOfLecture ?? '').toLowerCase() == 'lab';
-  final type = isLab ? 'Lab Session' : 'Lecture';
+  final lines = slot.lectures.map((lec) {
+    final subject = (lec.subjectName ?? lec.subjectCode ?? 'Untitled').trim();
+    final faculty = (lec.facultyName ?? '').trim();
+    final room = (lec.roomNumber ?? '').trim();
+    final batch = (lec.batch ?? '').trim();
+    final isLab = lec.isLabLecture || (lec.typeOfLecture ?? '').toLowerCase() == 'lab';
+    final type = isLab ? 'Lab Session' : 'Lecture';
 
-  final details = <String>[
-    if (faculty.isNotEmpty) faculty,
-    if (room.isNotEmpty) 'Room $room',
-    type,
-  ];
+    final details = <String>[
+      if (faculty.isNotEmpty) faculty,
+      if (room.isNotEmpty) 'Room $room',
+      if (batch.isNotEmpty) 'Batch $batch',
+      type,
+    ];
 
-  if (details.isEmpty) return subject;
-  return '$subject\n${details.join(' | ')}';
+    return details.isEmpty ? subject : '$subject (${details.join(' | ')})';
+  }).toList();
+
+  return lines.join('\n');
 }
 
 String _csvEscape(String value) {
@@ -432,12 +436,18 @@ String buildTimetableCsv(
         continue;
       }
 
-      final lec = slot.lectures.first;
-      final subject = lec.subjectName ?? lec.subjectCode ?? '';
-      final faculty = lec.facultyName ?? '';
-      final room = lec.roomNumber ?? '';
-      final type = lec.isLabLecture ? 'Lab' : (lec.typeOfLecture ?? 'Lecture');
-      row.add([subject, faculty, room, type].where((e) => e.isNotEmpty).join(' | '));
+      final lectureSegments = slot.lectures.map((lec) {
+        final subject = lec.subjectName ?? lec.subjectCode ?? '';
+        final faculty = lec.facultyName ?? '';
+        final room = lec.roomNumber ?? '';
+        final batch = lec.batch ?? '';
+        final type = lec.isLabLecture ? 'Lab' : (lec.typeOfLecture ?? 'Lecture');
+        return [subject, faculty, room, batch, type]
+            .where((e) => e.isNotEmpty)
+            .join(' | ');
+      }).toList();
+
+      row.add(lectureSegments.join(' || '));
     }
     rows.add(row);
   }

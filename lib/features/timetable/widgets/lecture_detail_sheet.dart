@@ -6,8 +6,14 @@ import '../../../models/lecture_assignment_model.dart';
 class LectureDetailSheet extends StatelessWidget {
   final TimeSlotModel slot;
   final void Function(LectureAssignmentModel)? onEdit;
+  final void Function(LectureAssignmentModel)? onSubstitute;
 
-  const LectureDetailSheet({super.key, required this.slot, this.onEdit});
+  const LectureDetailSheet({
+    super.key,
+    required this.slot,
+    this.onEdit,
+    this.onSubstitute,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -84,6 +90,12 @@ class LectureDetailSheet extends StatelessWidget {
                     final lec = lectures[index];
                     return _LectureDetailCard(
                       lecture: lec,
+                      onSubstitute: onSubstitute != null
+                          ? () {
+                              Navigator.pop(context);
+                              onSubstitute!(lec);
+                            }
+                          : null,
                       onEdit: onEdit != null
                           ? () {
                               Navigator.pop(context);
@@ -105,8 +117,13 @@ class LectureDetailSheet extends StatelessWidget {
 class _LectureDetailCard extends StatelessWidget {
   final LectureAssignmentModel lecture;
   final VoidCallback? onEdit;
+  final VoidCallback? onSubstitute;
 
-  const _LectureDetailCard({required this.lecture, this.onEdit});
+  const _LectureDetailCard({
+    required this.lecture,
+    this.onEdit,
+    this.onSubstitute,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -161,6 +178,13 @@ class _LectureDetailCard extends StatelessWidget {
                 tooltip: 'Edit this lecture',
                 color: AppColors.primary,
                 onPressed: onEdit,
+              ),
+            if (onSubstitute != null)
+              IconButton(
+                icon: const Icon(Icons.swap_horiz_rounded),
+                tooltip: 'Create substitution',
+                color: AppColors.warning,
+                onPressed: onSubstitute,
               ),
           ],
         ),

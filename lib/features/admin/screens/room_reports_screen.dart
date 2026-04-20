@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../models/timetable_day_model.dart';
+import '../../../models/time_slot_model.dart';
 import '../../../providers/room_provider.dart';
 import '../../../services/timetable_service.dart';
+import '../../timetable/utils/slot_grouping.dart';
 import '../../timetable/widgets/timetable_grid_widget.dart';
 
 class RoomReportsScreen extends ConsumerStatefulWidget {
@@ -43,20 +45,13 @@ class _RoomReportsScreenState extends ConsumerState<RoomReportsScreen> {
   Future<void> _bootstrap() async {
     await ref.read(roomProvider.notifier).loadRooms();
 
-    final rooms = ref
-        .read(roomProvider)
-        .rooms
-        .where((r) => r.active)
-        .toList();
+    final rooms = ref.read(roomProvider).rooms.where((r) => r.active).toList();
 
     if (_selectedRoomNumber == null && rooms.isNotEmpty) {
       _selectedRoomNumber = rooms.first.roomNumber;
     }
 
-    await Future.wait([
-      _loadRoomTimetable(),
-      _loadUsageReport(),
-    ]);
+    await Future.wait([_loadRoomTimetable(), _loadUsageReport()]);
   }
 
   Future<void> _loadRoomTimetable() async {
@@ -140,7 +135,10 @@ class _RoomReportsScreenState extends ConsumerState<RoomReportsScreen> {
               children: [
                 Expanded(
                   child: DropdownButtonFormField<String>(
-                    value: activeRooms.any((r) => r.roomNumber == _selectedRoomNumber)
+                    value:
+                        activeRooms.any(
+                          (r) => r.roomNumber == _selectedRoomNumber,
+                        )
                         ? _selectedRoomNumber
                         : null,
                     decoration: const InputDecoration(
@@ -152,7 +150,9 @@ class _RoomReportsScreenState extends ConsumerState<RoomReportsScreen> {
                         .map(
                           (r) => DropdownMenuItem(
                             value: r.roomNumber,
-                            child: Text('${r.roomNumber} • ${r.roomType ?? 'Classroom'}'),
+                            child: Text(
+                              '${r.roomNumber} • ${r.roomType ?? 'Classroom'}',
+                            ),
                           ),
                         )
                         .toList(),
@@ -234,12 +234,18 @@ class _RoomReportsScreenState extends ConsumerState<RoomReportsScreen> {
     return Column(
       children: _orderedDays.map((dayName) {
         final day = byDay[dayName];
-        final slots = day?.slots.where((s) => s.lectures.isNotEmpty).toList() ?? [];
+        final slots = day == null
+            ? <TimeSlotModel>[]
+            : collapseConsecutiveLabSlots(
+                day.slots,
+              ).where((s) => s.lectures.isNotEmpty).toList();
 
         return ExpansionTile(
           title: Text(dayName),
           subtitle: Text(
-            slots.isEmpty ? 'No lectures' : '${slots.length} lecture${slots.length == 1 ? '' : 's'}',
+            slots.isEmpty
+                ? 'No lectures'
+                : '${slots.length} lecture${slots.length == 1 ? '' : 's'}',
           ),
           childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
           initiallyExpanded: dayName == 'Monday',
@@ -257,7 +263,8 @@ class _RoomReportsScreenState extends ConsumerState<RoomReportsScreen> {
                   padding: const EdgeInsets.only(bottom: 8),
                   child: TimetableGridWidget(
                     slot: slot,
-                    color: AppColors.subjectColors[i % AppColors.subjectColors.length],
+                    color: AppColors
+                        .subjectColors[i % AppColors.subjectColors.length],
                   ),
                 );
               }),
@@ -276,15 +283,17 @@ class _RoomReportsScreenState extends ConsumerState<RoomReportsScreen> {
     }
 
     final sorted = [..._usageRows]
-      ..sort((a, b) =>
-          ((b['assignedLectures'] as num?) ?? 0).compareTo((a['assignedLectures'] as num?) ?? 0));
+      ..sort(
+        (a, b) => ((b['assignedLectures'] as num?) ?? 0).compareTo(
+          (a['assignedLectures'] as num?) ?? 0,
+        ),
+      );
 
     final maxLectures = sorted.fold<int>(
       0,
-      (prev, row) =>
-          ((row['assignedLectures'] as num?)?.toInt() ?? 0) > prev
-              ? ((row['assignedLectures'] as num?)?.toInt() ?? 0)
-              : prev,
+      (prev, row) => ((row['assignedLectures'] as num?)?.toInt() ?? 0) > prev
+          ? ((row['assignedLectures'] as num?)?.toInt() ?? 0)
+          : prev,
     );
 
     return Column(
@@ -292,7 +301,8 @@ class _RoomReportsScreenState extends ConsumerState<RoomReportsScreen> {
         final room = (row['roomNumber'] ?? '').toString();
         final type = (row['roomType'] ?? '').toString();
         final lectures = (row['assignedLectures'] as num?)?.toInt() ?? 0;
-        final utilization = (row['utilizationPercent'] as num?)?.toDouble() ?? 0;
+        final utilization =
+            (row['utilizationPercent'] as num?)?.toDouble() ?? 0;
         final ratio = maxLectures > 0 ? lectures / maxLectures : 0.0;
 
         return Padding(
@@ -328,7 +338,9 @@ class _RoomReportsScreenState extends ConsumerState<RoomReportsScreen> {
                     value: ratio,
                     minHeight: 10,
                     backgroundColor: AppColors.primary.withOpacity(0.1),
-                    valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                      AppColors.primary,
+                    ),
                   ),
                 ),
               ),
@@ -371,17 +383,13 @@ class _SectionCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              title,
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
+            Text(title, style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 2),
             Text(
               subtitle,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: AppColors.textSecondary),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
             ),
             const SizedBox(height: 10),
             child,

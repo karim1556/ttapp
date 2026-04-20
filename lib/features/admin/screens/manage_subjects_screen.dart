@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../models/subject_model.dart';
-import '../../../models/faculty_model.dart';
 import '../../../providers/subject_provider.dart';
 import '../../../providers/faculty_provider.dart';
 import '../../../widgets/empty_state_widget.dart';
@@ -131,8 +130,12 @@ class _ManageSubjectsScreenState extends ConsumerState<ManageSubjectsScreen> {
         TextEditingController(text: existing?.subjectName);
     final codeCtrl =
         TextEditingController(text: existing?.subjectCode);
-    final creditsCtrl = TextEditingController(
-        text: existing?.totalCredits?.toString() ?? '');
+    final weeklyHoursCtrl = TextEditingController(
+      text: existing == null
+        ? ''
+        : (existing.weeklyHours ?? existing.totalCredits).toString());
+    final semesterHoursCtrl = TextEditingController(
+      text: existing?.semesterHours?.toString() ?? '');
     final maxMarksCtrl = TextEditingController(
         text: existing?.maxMarks?.toString() ?? '');
     final oralMarksCtrl = TextEditingController(
@@ -244,12 +247,24 @@ class _ManageSubjectsScreenState extends ConsumerState<ManageSubjectsScreen> {
                     ),
                     const SizedBox(height: 10),
                     TextFormField(
-                      controller: creditsCtrl,
+                      controller: weeklyHoursCtrl,
                       decoration: const InputDecoration(
-                          labelText: 'Total Credits (Lectures/Week) *'),
+                          labelText: 'Weekly Required Hours *'),
                       keyboardType: TextInputType.number,
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) return 'Required';
+                        if (int.tryParse(v.trim()) == null) return 'Must be a number';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      controller: semesterHoursCtrl,
+                      decoration: const InputDecoration(
+                          labelText: 'Total Semester Hours (e.g. 20)'),
+                      keyboardType: TextInputType.number,
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return null;
                         if (int.tryParse(v.trim()) == null) return 'Must be a number';
                         return null;
                       },
@@ -421,7 +436,11 @@ class _ManageSubjectsScreenState extends ConsumerState<ManageSubjectsScreen> {
                   'subjectName': nameCtrl.text.trim(),
                   'subjectCode': codeCtrl.text.trim(),
                   'semester': semValue,
-                  'totalCredits': int.parse(creditsCtrl.text.trim()),
+                  'weeklyHours': int.parse(weeklyHoursCtrl.text.trim()),
+                  // Keep backward compatibility with existing backend contracts.
+                  'totalCredits': int.parse(weeklyHoursCtrl.text.trim()),
+                  if (semesterHoursCtrl.text.trim().isNotEmpty)
+                    'semesterHours': int.tryParse(semesterHoursCtrl.text.trim()),
                   'isPractical': isPractical ? 1 : 0,
                   'isOral': isOral ? 1 : 0,
                   'branchId': branchId,
@@ -651,9 +670,15 @@ class _SubjectCard extends StatelessWidget {
                     color: AppColors.info),
                 const SizedBox(width: 4),
                 _TagChip(
-                    label:
-                        '${subject.totalCredits} lec/wk',
+                label:
+                  '${subject.weeklyHours ?? subject.totalCredits} hr/wk',
                     color: AppColors.secondary),
+              if (subject.semesterHours != null) ...[
+                const SizedBox(width: 4),
+                _TagChip(
+                  label: '${subject.semesterHours} hr/sem',
+                  color: AppColors.warning),
+              ],
                 if (subject.isLabSubject) ...[
                   const SizedBox(width: 4),
                   _TagChip(

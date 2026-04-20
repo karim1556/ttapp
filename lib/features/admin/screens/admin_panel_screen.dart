@@ -37,9 +37,7 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen> {
 
     // Redirect non-admins
     if (user != null && !user.isAdmin) {
-      return const Scaffold(
-        body: Center(child: Text('Access Denied')),
-      );
+      return const Scaffold(body: Center(child: Text('Access Denied')));
     }
 
     return LoadingOverlayWidget(
@@ -47,93 +45,115 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen> {
       message: 'Generating timetable...\nThis may take a moment.',
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Admin Panel'),
+          title: const Text('Admin Workspace'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh_outlined),
+              onPressed: () {
+                ref.read(facultyProvider.notifier).loadFaculty();
+                ref.read(subjectProvider.notifier).loadSubjects();
+                ref.read(timetableProvider.notifier).loadWeeklyTimetable();
+              },
+            ),
+          ],
         ),
         body: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            // Stats row
+            _AdminHeroCard(
+              adminName: (user?.email ?? 'admin').split('@').first,
+              teacherCount: facultyState.faculty.length,
+              subjectCount: subjectState.subjects.length,
+            ),
+            const SizedBox(height: 14),
             _StatsRow(
               teacherCount: facultyState.faculty.length,
               subjectCount: subjectState.subjects.length,
               timetableCount: timetableState.weeklyTimetable.length,
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
 
-            // Generate Timetable section
-            Text(
-              'Timetable Generation',
-              style: Theme.of(context).textTheme.titleLarge,
+            const _SectionTitle(
+              title: 'Timetable Generation',
+              subtitle:
+                  'Generate even/odd term schedules for A and B divisions',
             ),
-            const SizedBox(height: 12),
-            _GenerateTimetableCard(
-              onGenerate: _handleGenerate,
-              onGenerateAll: _handleGenerateAll,
-            ),
+            const SizedBox(height: 10),
+            _GenerateTimetableCard(onGenerateAll: _handleGenerateAll),
 
             const SizedBox(height: 24),
 
-            // Management section
-            Text(
-              'Management',
-              style: Theme.of(context).textTheme.titleLarge,
+            const _SectionTitle(
+              title: 'Management',
+              subtitle: 'Configure faculty, subjects, rooms and reports',
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
 
-            _AdminActionCard(
-              icon: Icons.people_outlined,
-              title: 'Manage Teachers',
-              subtitle: '${facultyState.faculty.length} teachers registered',
-              color: AppColors.primary,
-              onTap: () => context.push(AppRoutes.manageTeachers),
-            ),
-            const SizedBox(height: 10),
-            _AdminActionCard(
-              icon: Icons.book_outlined,
-              title: 'Manage Subjects',
-              subtitle: '${subjectState.subjects.length} subjects configured',
-              color: AppColors.secondary,
-              onTap: () => context.push(AppRoutes.manageSubjects),
-            ),
-            const SizedBox(height: 10),
-            _AdminActionCard(
-              icon: Icons.grid_view_rounded,
-              title: 'View Timetable',
-              subtitle: 'View generated weekly timetable',
-              color: AppColors.success,
-              onTap: () => context.go(AppRoutes.timetable),
-            ),
-            const SizedBox(height: 10),
-            _AdminActionCard(
-              icon: Icons.school_outlined,
-              title: 'COPO Management',
-              subtitle: 'Map courses to outcomes & enroll users',
-              color: AppColors.warning,
-              onTap: () => context.push(AppRoutes.copo),
-            ),
-            const SizedBox(height: 10),
-            _AdminActionCard(
-              icon: Icons.meeting_room_outlined,
-              title: 'Manage Rooms',
-              subtitle: 'Classrooms, labs and their capacities',
-              color: Colors.teal,
-              onTap: () => context.push(AppRoutes.manageRooms),
-            ),
-            const SizedBox(height: 10),
-            _AdminActionCard(
-              icon: Icons.domain_verification_outlined,
-              title: 'Room Timetable & Usage',
-              subtitle: 'View room-wise timetable and occupancy analytics',
-              color: Colors.blueGrey,
-              onTap: () => context.push(AppRoutes.roomReports),
-            ),
-            const SizedBox(height: 10),
-            _AdminActionCard(
-              icon: Icons.schedule_outlined,
-              title: 'Configure Time Slots',
-              subtitle: 'Custom periods and break slots',
-              color: Colors.deepPurple,
-              onTap: () => context.push(AppRoutes.manageTimeslots),
+            GridView.count(
+              crossAxisCount: 2,
+              childAspectRatio: 1.16,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              children: [
+                _AdminActionTile(
+                  icon: Icons.people_outlined,
+                  title: 'Teachers',
+                  subtitle: '${facultyState.faculty.length} registered',
+                  color: AppColors.primary,
+                  onTap: () => context.push(AppRoutes.manageTeachers),
+                ),
+                _AdminActionTile(
+                  icon: Icons.book_outlined,
+                  title: 'Subjects',
+                  subtitle: '${subjectState.subjects.length} configured',
+                  color: AppColors.secondary,
+                  onTap: () => context.push(AppRoutes.manageSubjects),
+                ),
+                _AdminActionTile(
+                  icon: Icons.grid_view_rounded,
+                  title: 'Timetable',
+                  subtitle: 'Weekly view',
+                  color: AppColors.success,
+                  onTap: () => context.go(AppRoutes.timetable),
+                ),
+                _AdminActionTile(
+                  icon: Icons.swap_horiz_rounded,
+                  title: 'Substitutions',
+                  subtitle: 'Day-only replacements',
+                  color: AppColors.info,
+                  onTap: () => context.push(AppRoutes.substitutions),
+                ),
+                _AdminActionTile(
+                  icon: Icons.school_outlined,
+                  title: 'COPO',
+                  subtitle: 'Outcome mapping',
+                  color: AppColors.warning,
+                  onTap: () => context.push(AppRoutes.copo),
+                ),
+                _AdminActionTile(
+                  icon: Icons.meeting_room_outlined,
+                  title: 'Rooms',
+                  subtitle: 'Labs & classes',
+                  color: Colors.teal,
+                  onTap: () => context.push(AppRoutes.manageRooms),
+                ),
+                _AdminActionTile(
+                  icon: Icons.domain_verification_outlined,
+                  title: 'Room Reports',
+                  subtitle: 'Usage insights',
+                  color: Colors.blueGrey,
+                  onTap: () => context.push(AppRoutes.roomReports),
+                ),
+                _AdminActionTile(
+                  icon: Icons.schedule_outlined,
+                  title: 'Time Slots',
+                  subtitle: 'Periods & breaks',
+                  color: const Color(0xFF6D4DF2),
+                  onTap: () => context.push(AppRoutes.manageTimeslots),
+                ),
+              ],
             ),
 
             const SizedBox(height: 24),
@@ -143,16 +163,18 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen> {
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: timetableState.generateMessage!.contains('failed') ||
+                  color:
+                      timetableState.generateMessage!.contains('failed') ||
                           timetableState.generateMessage!.contains('Error')
-                      ? AppColors.error.withOpacity(0.1)
-                      : AppColors.success.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
+                      ? AppColors.error.withValues(alpha: 0.1)
+                      : AppColors.success.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: timetableState.generateMessage!.contains('failed') ||
+                    color:
+                        timetableState.generateMessage!.contains('failed') ||
                             timetableState.generateMessage!.contains('Error')
-                        ? AppColors.error.withOpacity(0.4)
-                        : AppColors.success.withOpacity(0.4),
+                        ? AppColors.error.withValues(alpha: 0.4)
+                        : AppColors.success.withValues(alpha: 0.4),
                   ),
                 ),
                 child: Row(
@@ -162,15 +184,14 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen> {
                               timetableState.generateMessage!.contains('Error')
                           ? Icons.error_outline
                           : Icons.check_circle_outline,
-                      color: timetableState.generateMessage!.contains('failed') ||
+                      color:
+                          timetableState.generateMessage!.contains('failed') ||
                               timetableState.generateMessage!.contains('Error')
                           ? AppColors.error
                           : AppColors.success,
                     ),
                     const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(timetableState.generateMessage!),
-                    ),
+                    Expanded(child: Text(timetableState.generateMessage!)),
                   ],
                 ),
               ),
@@ -188,8 +209,13 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen> {
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 12),
-              _WorkloadSection(
-                workload: _computeWorkload(timetableState.weeklyTimetable),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: _WorkloadSection(
+                    workload: _computeWorkload(timetableState.weeklyTimetable),
+                  ),
+                ),
               ),
             ],
           ],
@@ -216,25 +242,18 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen> {
     return Map.fromEntries(sorted);
   }
 
-  Future<void> _handleGenerate({
-    required int branchId,
-    required int semester,
-    required String division,
-    required String academicYear,
-  }) async {
-    await ref.read(timetableProvider.notifier).generateTimetable(
-          branchId: branchId,
-          semester: semester,
-          division: division,
-          academicYear: academicYear,
-        );
-  }
-
   Future<void> _handleGenerateAll({
     required String academicYear,
+    required int branchId,
+    required String termType,
   }) async {
-    await ref.read(timetableProvider.notifier).generateAllTimetables(
+    await ref
+        .read(timetableProvider.notifier)
+        .generateAllTimetables(
           academicYear: academicYear,
+          branchIds: [branchId],
+          divisions: const ['A', 'B'],
+          termType: termType,
         );
   }
 }
@@ -279,6 +298,105 @@ class _StatsRow extends StatelessWidget {
   }
 }
 
+class _AdminHeroCard extends StatelessWidget {
+  final String adminName;
+  final int teacherCount;
+  final int subjectCount;
+
+  const _AdminHeroCard({
+    required this.adminName,
+    required this.teacherCount,
+    required this.subjectCount,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF5E87F7), Color(0xFF7EA4FF)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.3),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Control Center',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Hi ${adminName[0].toUpperCase()}${adminName.substring(1)}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 23,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  '$teacherCount teachers, $subjectCount subjects ready for scheduling',
+                  style: const TextStyle(color: Colors.white70),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(
+              Icons.auto_graph_rounded,
+              color: Colors.white,
+              size: 30,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  final String title;
+  final String subtitle;
+
+  const _SectionTitle({required this.title, required this.subtitle});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 2),
+        Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
+      ],
+    );
+  }
+}
+
 class _StatCard extends StatelessWidget {
   final String label;
   final String value;
@@ -298,18 +416,26 @@ class _StatCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.2)),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.divider),
         ),
         child: Column(
           children: [
-            Icon(icon, color: color, size: 24),
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
             const SizedBox(height: 6),
             Text(
               value,
               style: TextStyle(
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w800,
                 fontSize: 22,
                 color: color,
               ),
@@ -328,21 +454,88 @@ class _StatCard extends StatelessWidget {
   }
 }
 
+class _AdminActionTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _AdminActionTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppColors.divider),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 22),
+            ),
+            const Spacer(),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _GenerateTimetableCard extends StatefulWidget {
   final Future<void> Function({
+    required String academicYear,
     required int branchId,
-    required int semester,
-    required String division,
-    required String academicYear,
-  }) onGenerate;
-  final Future<void> Function({
-    required String academicYear,
-  }) onGenerateAll;
+    required String termType,
+  })
+  onGenerateAll;
 
-  const _GenerateTimetableCard({
-    required this.onGenerate,
-    required this.onGenerateAll,
-  });
+  const _GenerateTimetableCard({required this.onGenerateAll});
 
   @override
   State<_GenerateTimetableCard> createState() => _GenerateTimetableCardState();
@@ -350,152 +543,144 @@ class _GenerateTimetableCard extends StatefulWidget {
 
 class _GenerateTimetableCardState extends State<_GenerateTimetableCard> {
   int _branchId = 1;
-  int _semester = 5;
-  String _division = 'A';
+  String _termType = 'even';
   String _academicYear = '2024-25';
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(10),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.divider),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF5E87F7), Color(0xFF79A1FF)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                  child: const Icon(Icons.auto_awesome_outlined,
-                      color: AppColors.primary),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Generate Timetable',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      Text(
-                        'AI-powered conflict-free scheduling',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
+                child: const Icon(
+                  Icons.auto_awesome_outlined,
+                  color: Colors.white,
                 ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            const Divider(),
-            const SizedBox(height: 12),
-
-            // Parameters
-            Row(
-              children: [
-                Expanded(
-                  child: _DropdownField<int>(
-                    label: 'Branch',
-                    value: _branchId,
-                    items: const [
-                      DropdownMenuItem(value: 1, child: Text('CS')),
-                      DropdownMenuItem(value: 2, child: Text('IT')),
-                      DropdownMenuItem(value: 3, child: Text('EXTC')),
-                      DropdownMenuItem(value: 4, child: Text('Mech')),
-                    ],
-                    onChanged: (v) => setState(() => _branchId = v!),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _DropdownField<int>(
-                    label: 'Semester',
-                    value: _semester,
-                    items: List.generate(
-                      8,
-                      (i) => DropdownMenuItem(
-                        value: i + 1,
-                        child: Text('Sem ${i + 1}'),
-                      ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Generate Timetable',
+                      style: Theme.of(context).textTheme.titleMedium,
                     ),
-                    onChanged: (v) => setState(() => _semester = v!),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: _DropdownField<String>(
-                    label: 'Division',
-                    value: _division,
-                    items: const [
-                      DropdownMenuItem(value: 'A', child: Text('Division A')),
-                      DropdownMenuItem(value: 'B', child: Text('Division B')),
-                      DropdownMenuItem(value: 'C', child: Text('Division C')),
-                    ],
-                    onChanged: (v) => setState(() => _division = v!),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _DropdownField<String>(
-                    label: 'Academic Year',
-                    value: _academicYear,
-                    items: const [
-                      DropdownMenuItem(value: '2024-25', child: Text('2024-25')),
-                      DropdownMenuItem(value: '2025-26', child: Text('2025-26')),
-                    ],
-                    onChanged: (v) => setState(() => _academicYear = v!),
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 16),
-
-            SizedBox(
-              height: 52,
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.auto_awesome_rounded),
-                label: const Text(
-                  'Generate Timetable',
-                  style: TextStyle(fontSize: 16),
-                ),
-                onPressed: () => widget.onGenerate(
-                  branchId: _branchId,
-                  semester: _semester,
-                  division: _division,
-                  academicYear: _academicYear,
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
+                    Text(
+                      'Smart conflict-free scheduling',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
                 ),
               ),
-            ),
-            const SizedBox(height: 10),
-            SizedBox(
-              height: 52,
-              child: OutlinedButton.icon(
-                icon: const Icon(Icons.auto_fix_high_outlined),
-                label: const Text(
-                  'Generate All Classes (Single Click)',
-                  style: TextStyle(fontSize: 15),
-                ),
-                onPressed: () => widget.onGenerateAll(
-                  academicYear: _academicYear,
+            ],
+          ),
+          const SizedBox(height: 16),
+          Divider(color: AppColors.divider.withValues(alpha: 0.9)),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _DropdownField<int>(
+                  label: 'Branch',
+                  value: _branchId,
+                  items: const [
+                    DropdownMenuItem(value: 1, child: Text('CS')),
+                    DropdownMenuItem(value: 2, child: Text('IT')),
+                    DropdownMenuItem(value: 3, child: Text('EXTC')),
+                    DropdownMenuItem(value: 4, child: Text('Mech')),
+                  ],
+                  onChanged: (v) => setState(() => _branchId = v!),
                 ),
               ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _DropdownField<String>(
+                  label: 'Term',
+                  value: _termType,
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'even',
+                      child: Text('Even (2,4,6,8)'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'odd',
+                      child: Text('Odd (1,3,5,7)'),
+                    ),
+                  ],
+                  onChanged: (v) => setState(() => _termType = v ?? 'even'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: InputDecorator(
+                  decoration: const InputDecoration(labelText: 'Divisions'),
+                  child: const Text('A and B (fixed)'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _DropdownField<String>(
+                  label: 'Academic Year',
+                  value: _academicYear,
+                  items: const [
+                    DropdownMenuItem(value: '2024-25', child: Text('2024-25')),
+                    DropdownMenuItem(value: '2025-26', child: Text('2025-26')),
+                  ],
+                  onChanged: (v) => setState(() => _academicYear = v!),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 52,
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.auto_awesome_rounded),
+              label: Text(
+                _termType == 'even'
+                    ? 'Generate Even Semesters (A+B)'
+                    : 'Generate Odd Semesters (A+B)',
+                style: const TextStyle(fontSize: 16),
+              ),
+              onPressed: () => widget.onGenerateAll(
+                academicYear: _academicYear,
+                branchId: _branchId,
+                termType: _termType,
+              ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -517,71 +702,11 @@ class _DropdownField<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<T>(
-      value: value,
+      initialValue: value,
       decoration: InputDecoration(labelText: label),
       items: items,
       onChanged: onChanged,
       isExpanded: true,
-    );
-  }
-}
-
-class _AdminActionCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _AdminActionCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: color, size: 24),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                    Text(
-                      subtitle,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(Icons.chevron_right, color: AppColors.textSecondary),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
@@ -597,8 +722,10 @@ class _WorkloadSection extends StatelessWidget {
     if (workload.isEmpty) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 8),
-        child: Text('No lecture assignments found.',
-            style: TextStyle(color: AppColors.textSecondary)),
+        child: Text(
+          'No lecture assignments found.',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
       );
     }
 
@@ -617,7 +744,9 @@ class _WorkloadSection extends StatelessWidget {
                   entry.key,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w500),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
@@ -627,9 +756,10 @@ class _WorkloadSection extends StatelessWidget {
                   child: LinearProgressIndicator(
                     value: fraction,
                     minHeight: 10,
-                    backgroundColor: AppColors.primary.withOpacity(0.1),
-                    valueColor:
-                        const AlwaysStoppedAnimation<Color>(AppColors.primary),
+                    backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                      AppColors.primary,
+                    ),
                   ),
                 ),
               ),
@@ -637,7 +767,9 @@ class _WorkloadSection extends StatelessWidget {
               Text(
                 '${entry.value} lec',
                 style: const TextStyle(
-                    fontSize: 12, color: AppColors.textSecondary),
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
               ),
             ],
           ),

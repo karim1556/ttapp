@@ -28,8 +28,9 @@ class ServerUrlNotifier extends StateNotifier<String> {
   }
 }
 
-final serverUrlProvider =
-    StateNotifierProvider<ServerUrlNotifier, String>((ref) {
+final serverUrlProvider = StateNotifierProvider<ServerUrlNotifier, String>((
+  ref,
+) {
   return ServerUrlNotifier();
 });
 
@@ -141,12 +142,32 @@ class _AuthInterceptor extends Interceptor {
 
   _AuthInterceptor(this._storageService);
 
+  bool _isPublicAuthRoute(String path) {
+    final normalized = path.toLowerCase();
+    return normalized.endsWith('/auth/login') ||
+        normalized.endsWith('/auth/refresh');
+  }
+
   @override
-  void onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
-    final token = await _storageService.getToken();
-    if (token != null && token.isNotEmpty) {
-      options.headers['Authorization'] = 'Bearer $token';
+  void onRequest(
+    RequestOptions options,
+    RequestInterceptorHandler handler,
+  ) async {
+    // Never block login/refresh calls on token reads.
+    if (_isPublicAuthRoute(options.path)) {
+      handler.next(options);
+      return;
     }
+
+    try {
+      final token = await _storageService.getToken();
+      if (token != null && token.isNotEmpty) {
+        options.headers['Authorization'] = 'Bearer $token';
+      }
+    } catch (_) {
+      // Proceed without Authorization rather than stalling requests.
+    }
+
     handler.next(options);
   }
 

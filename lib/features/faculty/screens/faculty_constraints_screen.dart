@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../models/constraint_model.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/constraint_provider.dart';
+import '../../../services/faculty_service.dart';
 import '../../../widgets/loading_overlay_widget.dart';
 
 class FacultyConstraintsScreen extends ConsumerStatefulWidget {
@@ -17,6 +18,7 @@ class FacultyConstraintsScreen extends ConsumerStatefulWidget {
 
 class _FacultyConstraintsScreenState
     extends ConsumerState<FacultyConstraintsScreen> {
+  int _weeklyWorkHours = 18;
   int _maxPerDay = 4;
   int _totalPerWeek = 18;
   final List<UnavailableSlot> _unavailableSlots = [];
@@ -28,11 +30,26 @@ class _FacultyConstraintsScreenState
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final user = ref.read(currentUserProvider);
       if (user != null) {
+        _loadMyWeeklyWorkHours();
         ref
             .read(constraintProvider.notifier)
             .loadConstraints(int.tryParse(user.uid.toString()) ?? 0);
       }
     });
+  }
+
+  Future<void> _loadMyWeeklyWorkHours() async {
+    try {
+      final profile = await ref
+          .read(facultyServiceProvider)
+          .fetchMyFacultyProfile();
+      if (!mounted) return;
+      setState(() {
+        _weeklyWorkHours = profile.weeklyWorkHours ?? _weeklyWorkHours;
+      });
+    } catch (_) {
+      // Non-blocking load; constraints screen still works without this.
+    }
   }
 
   // Sync local state when constraint data loads
@@ -67,7 +84,7 @@ class _FacultyConstraintsScreenState
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Scheduling Constraints'),
+        title: const Text('Faculty Constraints'),
         actions: [
           TextButton.icon(
             onPressed: isSaving ? null : _saveConstraints,
@@ -89,8 +106,12 @@ class _FacultyConstraintsScreenState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  _heroCard(context),
+                  const SizedBox(height: 16),
                   _infoCard(context),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
+                  _weeklyWorkHoursCard(context),
+                  const SizedBox(height: 16),
                   _maxLecturesCard(context),
                   const SizedBox(height: 16),
                   _totalLecturesCard(context),
@@ -112,8 +133,10 @@ class _FacultyConstraintsScreenState
             ),
             child: isSaving
                 ? const CircularProgressIndicator(color: Colors.white)
-                : const Text('Save Constraints',
-                    style: TextStyle(fontSize: 16)),
+                : const Text(
+                    'Save Constraints',
+                    style: TextStyle(fontSize: 16),
+                  ),
           ),
         ),
       ),
@@ -124,22 +147,76 @@ class _FacultyConstraintsScreenState
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.info.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.info.withOpacity(0.3)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Row(
         children: [
-          const Icon(Icons.info_outline, color: AppColors.info),
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: AppColors.info.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.info_outline, color: AppColors.info),
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               'These constraints help the AI scheduler assign your lectures. '
               'Mark slots you are unavailable, and optionally preferred timings.',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: AppColors.info),
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _heroCard(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF5E87F7), Color(0xFF79A1FF)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.tune_rounded, color: Colors.white),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Teaching Availability',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 18,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Set limits for fair, conflict-free scheduling',
+                  style: TextStyle(color: Colors.white70),
+                ),
+              ],
             ),
           ),
         ],
@@ -155,15 +232,14 @@ class _FacultyConstraintsScreenState
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('$_maxPerDay lectures',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleLarge
-                      ?.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.bold)),
-              Text('(1 – 8)',
-                  style: Theme.of(context).textTheme.bodySmall),
+              Text(
+                '$_maxPerDay lectures',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text('(1 – 8)', style: Theme.of(context).textTheme.bodySmall),
             ],
           ),
           Slider(
@@ -180,6 +256,38 @@ class _FacultyConstraintsScreenState
     );
   }
 
+  Widget _weeklyWorkHoursCard(BuildContext context) {
+    return _SectionCard(
+      title: 'My Total Work Hours Per Week',
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '$_weeklyWorkHours hours',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text('(1 – 60)', style: Theme.of(context).textTheme.bodySmall),
+            ],
+          ),
+          Slider(
+            value: _weeklyWorkHours.toDouble(),
+            min: 1,
+            max: 60,
+            divisions: 59,
+            label: '$_weeklyWorkHours',
+            activeColor: AppColors.primary,
+            onChanged: (v) => setState(() => _weeklyWorkHours = v.round()),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _totalLecturesCard(BuildContext context) {
     return _SectionCard(
       title: 'Total Lectures Per Week',
@@ -188,15 +296,14 @@ class _FacultyConstraintsScreenState
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('$_totalPerWeek lectures',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleLarge
-                      ?.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.bold)),
-              Text('(5 – 30)',
-                  style: Theme.of(context).textTheme.bodySmall),
+              Text(
+                '$_totalPerWeek lectures',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text('(5 – 30)', style: Theme.of(context).textTheme.bodySmall),
             ],
           ),
           Slider(
@@ -218,10 +325,7 @@ class _FacultyConstraintsScreenState
       title: 'Unavailable Slots',
       trailing: IconButton(
         icon: const Icon(Icons.add_circle_outline, color: AppColors.primary),
-        onPressed: () => _addSlotDialog(
-          context,
-          isUnavailable: true,
-        ),
+        onPressed: () => _addSlotDialog(context, isUnavailable: true),
       ),
       child: _unavailableSlots.isEmpty
           ? const Padding(
@@ -238,13 +342,14 @@ class _FacultyConstraintsScreenState
               children: _unavailableSlots
                   .asMap()
                   .entries
-                  .map((entry) => _SlotChip(
-                        label:
-                            '${entry.value.day} — ${entry.value.startHour}:00',
-                        color: AppColors.error,
-                        onRemove: () => setState(
-                            () => _unavailableSlots.removeAt(entry.key)),
-                      ))
+                  .map(
+                    (entry) => _SlotChip(
+                      label: '${entry.value.day} — ${entry.value.startHour}:00',
+                      color: AppColors.error,
+                      onRemove: () =>
+                          setState(() => _unavailableSlots.removeAt(entry.key)),
+                    ),
+                  )
                   .toList(),
             ),
     );
@@ -272,13 +377,14 @@ class _FacultyConstraintsScreenState
               children: _preferredSlots
                   .asMap()
                   .entries
-                  .map((entry) => _SlotChip(
-                        label:
-                            '${entry.value.day} — ${entry.value.startHour}:00',
-                        color: AppColors.success,
-                        onRemove: () => setState(
-                            () => _preferredSlots.removeAt(entry.key)),
-                      ))
+                  .map(
+                    (entry) => _SlotChip(
+                      label: '${entry.value.day} — ${entry.value.startHour}:00',
+                      color: AppColors.success,
+                      onRemove: () =>
+                          setState(() => _preferredSlots.removeAt(entry.key)),
+                    ),
+                  )
                   .toList(),
             ),
     );
@@ -293,12 +399,14 @@ class _FacultyConstraintsScreenState
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDs) => AlertDialog(
-          title: Text(isUnavailable ? 'Add Unavailable Slot' : 'Add Preferred Slot'),
+          title: Text(
+            isUnavailable ? 'Add Unavailable Slot' : 'Add Preferred Slot',
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<String>(
-                value: selectedDay,
+                initialValue: selectedDay,
                 decoration: const InputDecoration(labelText: 'Day'),
                 items: AppConstants.daysOfWeek
                     .map((d) => DropdownMenuItem(value: d, child: Text(d)))
@@ -309,13 +417,15 @@ class _FacultyConstraintsScreenState
               ),
               const SizedBox(height: 10),
               DropdownButtonFormField<int>(
-                value: slotHour,
-                decoration:
-                    const InputDecoration(labelText: 'Time Slot'),
+                initialValue: slotHour,
+                decoration: const InputDecoration(labelText: 'Time Slot'),
                 items: List.generate(
-                    8,
-                    (i) => DropdownMenuItem(
-                        value: 8 + i, child: Text('Slot ${i + 1} (${8 + i}:00)'))),
+                  8,
+                  (i) => DropdownMenuItem(
+                    value: 8 + i,
+                    child: Text('Slot ${i + 1} (${8 + i}:00)'),
+                  ),
+                ),
                 onChanged: (v) {
                   if (v != null) setDs(() => slotHour = v);
                 },
@@ -331,21 +441,25 @@ class _FacultyConstraintsScreenState
               onPressed: () {
                 setState(() {
                   if (isUnavailable) {
-                    _unavailableSlots.add(UnavailableSlot(
-                      day: selectedDay,
-                      startHour: slotHour,
-                      startMinutes: 0,
-                      endHour: slotHour + 1,
-                      endMinutes: 0,
-                    ));
+                    _unavailableSlots.add(
+                      UnavailableSlot(
+                        day: selectedDay,
+                        startHour: slotHour,
+                        startMinutes: 0,
+                        endHour: slotHour + 1,
+                        endMinutes: 0,
+                      ),
+                    );
                   } else {
-                    _preferredSlots.add(PreferredSlot(
-                      day: selectedDay,
-                      startHour: slotHour,
-                      startMinutes: 0,
-                      endHour: slotHour + 1,
-                      endMinutes: 0,
-                    ));
+                    _preferredSlots.add(
+                      PreferredSlot(
+                        day: selectedDay,
+                        startHour: slotHour,
+                        startMinutes: 0,
+                        endHour: slotHour + 1,
+                        endMinutes: 0,
+                      ),
+                    );
                   }
                 });
                 Navigator.pop(ctx);
@@ -362,31 +476,54 @@ class _FacultyConstraintsScreenState
     final user = ref.read(currentUserProvider);
     if (user == null) return;
 
+    try {
+      await ref
+          .read(facultyServiceProvider)
+          .updateMyWeeklyWorkHours(_weeklyWorkHours);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save weekly work hours: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+      return;
+    }
+
     final facultyId = int.tryParse(user.uid.toString()) ?? 0;
+    final effectiveWeeklyCap = _totalPerWeek > _weeklyWorkHours
+        ? _weeklyWorkHours
+        : _totalPerWeek;
     final existing = ref.read(constraintProvider).constraint;
-    final constraint = (existing ??
-            ConstraintModel(
-              facultyId: facultyId,
+    final constraint =
+        (existing ??
+                ConstraintModel(
+                  facultyId: facultyId,
+                  maxLecturesPerDay: _maxPerDay,
+                  totalLecturesPerWeek: effectiveWeeklyCap,
+                ))
+            .copyWith(
               maxLecturesPerDay: _maxPerDay,
-              totalLecturesPerWeek: _totalPerWeek,
-            ))
-        .copyWith(
-      maxLecturesPerDay: _maxPerDay,
-      totalLecturesPerWeek: _totalPerWeek,
-      unavailableSlots: _unavailableSlots,
-      preferredSlots: _preferredSlots,
-    );
+              totalLecturesPerWeek: effectiveWeeklyCap,
+              unavailableSlots: _unavailableSlots,
+              preferredSlots: _preferredSlots,
+            );
 
     final success = await ref
         .read(constraintProvider.notifier)
         .saveConstraints(constraint);
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(
-            success ? 'Constraints saved successfully' : 'Failed to save'),
-        backgroundColor: success ? AppColors.success : AppColors.error,
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            success ? 'Constraints saved successfully' : 'Failed to save',
+          ),
+          backgroundColor: success ? AppColors.success : AppColors.error,
+        ),
+      );
     }
   }
 }
@@ -398,37 +535,36 @@ class _SectionCard extends StatelessWidget {
   final Widget child;
   final Widget? trailing;
 
-  const _SectionCard({
-    required this.title,
-    required this.child,
-    this.trailing,
-  });
+  const _SectionCard({required this.title, required this.child, this.trailing});
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                if (trailing != null) trailing!,
-              ],
-            ),
-            const SizedBox(height: 8),
-            child,
-          ],
-        ),
+              ),
+              ?trailing,
+            ],
+          ),
+          const SizedBox(height: 8),
+          child,
+        ],
       ),
     );
   }
@@ -451,18 +587,20 @@ class _SlotChip extends StatelessWidget {
       margin: const EdgeInsets.symmetric(vertical: 3),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
           Icon(Icons.access_time_outlined, color: color, size: 16),
           const SizedBox(width: 8),
           Expanded(
-              child: Text(label,
-                  style: TextStyle(
-                      color: color, fontWeight: FontWeight.w500))),
+            child: Text(
+              label,
+              style: TextStyle(color: color, fontWeight: FontWeight.w500),
+            ),
+          ),
           GestureDetector(
             onTap: onRemove,
             child: Icon(Icons.close, color: color, size: 18),
