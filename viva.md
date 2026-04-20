@@ -210,6 +210,53 @@ If asked "This is just rules, where is AI?":
 - No claim of deep learning model training in current version
 - We intentionally chose explainable scheduling AI due auditability needs in education
 
+## 7B) Algorithms Used (Exact Viva Answer)
+
+### 1. Constraint Satisfaction + Heuristic Scheduling (Backend Timetable Engine)
+- Core timetable generation is a constrained assignment problem.
+- Hard constraints are enforced first (faculty clash, room clash, slot compatibility, lab continuity).
+- Heuristics are then used to choose feasible placements quickly and improve schedule quality.
+
+### 2. Multi-Attempt Constructive Generation
+- Scheduler runs multiple construction attempts and keeps a valid/better solution.
+- This improves robustness when one attempt gets stuck due tight constraints.
+
+### 3. Conflict Detection via Time-Interval Overlap
+- For slot safety, overlap checks are used:
+  - Two slots overlap if startA < endB and startB < endA.
+- This logic is used for faculty conflict checks and substitution safety.
+
+### 4. Load-Balancing Heuristic
+- Faculty weekly load is considered while assigning/recommending.
+- Objective is to avoid over-concentration of lectures on few faculty.
+
+### 5. Gap-Minimization / Timetable Compaction Heuristic
+- After initial placement, timetable is compacted to reduce internal free gaps.
+- Improves practical usability of final schedule.
+
+### 6. Substitution Candidate Ranking (Scoring Algorithm)
+- Candidate score is computed and ranked.
+- Fallback formula used in app when preview API fails:
+  - score = 100 - 80*(conflict) - 1.5*(weeklyLoad)
+- Sort order: non-conflict candidates first, then higher score.
+
+### 7. Greedy Merge Algorithm for Lab Blocks (Frontend View Logic)
+- Consecutive lab slots with same lecture signature are merged into one visual block.
+- This is a greedy pass over sorted slots.
+
+### 8. Hash-Map Based Substitution Overlay (Day-Scoped)
+- Approved substitutions are indexed by lectureId in a map.
+- Overlay is applied only to target date view, preserving weekly base timetable.
+
+### 9. Sorting and Filtering Algorithms (Across Modules)
+- Date sorting for holidays/substitutions.
+- Score/load sorting for candidate recommendations.
+- Role/date/status based filtering for records and views.
+
+### 10. What Algorithm Family We Are Using (One-Line Defense)
+- Primarily: Constraint Satisfaction + Heuristics + Greedy local optimization.
+- Not using: deep learning model training, neural networks, or LLM-based generation.
+
 ## 8) Security, Reliability, and Offline Strategy
 - JWT-based protected APIs
 - Secure storage for token; Hive fallback to avoid login lockouts
