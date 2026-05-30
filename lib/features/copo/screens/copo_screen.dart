@@ -7,6 +7,7 @@ import '../../../providers/copo_provider.dart';
 import '../../../providers/subject_provider.dart';
 import '../../../widgets/empty_state_widget.dart';
 import '../../../widgets/loading_overlay_widget.dart';
+import '../../../core/utils/academic_year.dart';
 
 class CopoScreen extends ConsumerStatefulWidget {
   const CopoScreen({super.key});
@@ -18,11 +19,12 @@ class CopoScreen extends ConsumerStatefulWidget {
 class _CopoScreenState extends ConsumerState<CopoScreen> {
   int? _filterBranch;
   int? _filterSemester;
-  String _filterYear = '2025-26';
+  late String _filterYear;
 
   @override
   void initState() {
     super.initState();
+    _filterYear = currentAcademicYear();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(copoProvider.notifier).load(academicYear: _filterYear);
       ref.read(subjectProvider.notifier).loadSubjects();
@@ -120,7 +122,7 @@ class _CopoScreenState extends ConsumerState<CopoScreen> {
     int? courseId = existing?.courseId;
     int? semester = existing?.semester;
     int branchId = existing?.branch ?? 1;
-    String academicYear = existing?.academicYear ?? '2025-26';
+    String academicYear = existing?.academicYear ?? currentAcademicYear();
     int coCount = existing?.coCount ?? 2;
 
     showDialog(
@@ -190,14 +192,9 @@ class _CopoScreenState extends ConsumerState<CopoScreen> {
                       value: academicYear,
                       decoration:
                           const InputDecoration(labelText: 'Academic Year'),
-                      items: const [
-                        DropdownMenuItem(
-                            value: '2024-25', child: Text('2024-25')),
-                        DropdownMenuItem(
-                            value: '2025-26', child: Text('2025-26')),
-                        DropdownMenuItem(
-                            value: '2026-27', child: Text('2026-27')),
-                      ],
+                      items: academicYearOptions()
+                          .map((y) => DropdownMenuItem(value: y, child: Text(y)))
+                          .toList(),
                       onChanged: (v) {
                         if (v != null) setS(() => academicYear = v);
                       },
@@ -468,7 +465,7 @@ class _FilterBar extends StatelessWidget {
       builder: (ctx) => SimpleDialog(
         title: const Text('Academic Year'),
         children: [
-          for (final y in ['2024-25', '2025-26', '2026-27'])
+          for (final y in academicYearOptions())
             SimpleDialogOption(
               onPressed: () {
                 Navigator.pop(ctx);

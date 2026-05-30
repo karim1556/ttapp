@@ -140,6 +140,7 @@ class TimetableNotifier extends StateNotifier<TimetableState> {
     required int semester,
     required String division,
     required String academicYear,
+    bool force = false,
   }) async {
     state = state.copyWith(isGenerating: true, generateMessage: null);
     try {
@@ -148,6 +149,7 @@ class TimetableNotifier extends StateNotifier<TimetableState> {
         semester: semester,
         division: division,
         academicYear: academicYear,
+        force: force,
       );
       final message = result['message']?.toString() ?? 'Timetable generated successfully!';
       state = state.copyWith(isGenerating: false, generateMessage: message);
@@ -206,6 +208,7 @@ class TimetableNotifier extends StateNotifier<TimetableState> {
     List<int>? branchIds,
     List<int>? semesters,
     String? termType,
+    bool force = false,
   }) async {
     state = state.copyWith(isGenerating: true, generateMessage: null);
     try {
@@ -215,6 +218,7 @@ class TimetableNotifier extends StateNotifier<TimetableState> {
         branchIds: branchIds,
         semesters: semesters,
         termType: termType,
+        force: force,
       );
 
       final message = result['message']?.toString() ??

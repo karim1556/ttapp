@@ -155,6 +155,7 @@ class TimetableService {
     required int semester,
     required String division,
     required String academicYear,
+    bool force = false,
   }) async {
     final response = await _apiClient.post(
       ApiEndpoints.timetableGenerate,
@@ -163,6 +164,7 @@ class TimetableService {
         'sem': semester.toString(),
         'division': division,
         'academicYear': academicYear,
+        if (force) 'force': true,
       },
     );
     return response.data as Map<String, dynamic>;
@@ -175,6 +177,7 @@ class TimetableService {
     List<int>? branchIds,
     List<int>? semesters,
     String? termType,
+    bool force = false,
   }) async {
     final response = await _apiClient.post(
       ApiEndpoints.timetableGenerateAll,
@@ -184,6 +187,7 @@ class TimetableService {
         if (branchIds != null && branchIds.isNotEmpty) 'branchIds': branchIds,
         if (semesters != null && semesters.isNotEmpty) 'semesters': semesters,
         if (termType != null && termType.isNotEmpty) 'termType': termType,
+        if (force) 'force': true,
       },
     );
     return response.data as Map<String, dynamic>;

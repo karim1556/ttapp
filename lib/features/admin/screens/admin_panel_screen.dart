@@ -4,9 +4,14 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../navigation/app_router.dart';
 import '../../../providers/auth_provider.dart';
+import '../../../providers/constraint_provider.dart';
 import '../../../providers/faculty_provider.dart';
 import '../../../providers/subject_provider.dart';
 import '../../../providers/timetable_provider.dart';
+import '../../../providers/timeslot_provider.dart';
+import '../../../core/utils/academic_year.dart';
+import '../../../services/constraint_service.dart';
+import '../../../services/timetable_service.dart';
 import '../../../widgets/loading_overlay_widget.dart';
 
 class AdminPanelScreen extends ConsumerStatefulWidget {
@@ -23,6 +28,7 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(facultyProvider.notifier).loadFaculty();
       ref.read(subjectProvider.notifier).loadSubjects();
+      ref.read(timeslotProvider.notifier).loadTimeslots();
       ref.read(timetableProvider.notifier).loadWeeklyTimetable();
     });
   }
@@ -33,6 +39,7 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen> {
     final timetableState = ref.watch(timetableProvider);
     final facultyState = ref.watch(facultyProvider);
     final subjectState = ref.watch(subjectProvider);
+    final timeslotState = ref.watch(timeslotProvider);
     final isGenerating = timetableState.isGenerating;
 
     // Redirect non-admins
@@ -64,11 +71,17 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen> {
               adminName: (user?.email ?? 'admin').split('@').first,
               teacherCount: facultyState.faculty.length,
               subjectCount: subjectState.subjects.length,
+              activeTimeslotCount: timeslotState.timeslots
+                  .where((s) => s.active && !s.breakSlot)
+                  .length,
             ),
             const SizedBox(height: 14),
             _StatsRow(
               teacherCount: facultyState.faculty.length,
               subjectCount: subjectState.subjects.length,
+              timeslotCount: timeslotState.timeslots
+                  .where((s) => s.active && !s.breakSlot)
+                  .length,
               timetableCount: timetableState.weeklyTimetable.length,
             ),
             const SizedBox(height: 24),
@@ -79,7 +92,10 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen> {
                   'Generate even/odd term schedules for A and B divisions',
             ),
             const SizedBox(height: 10),
-            _GenerateTimetableCard(onGenerateAll: _handleGenerateAll),
+            _GenerateTimetableCard(
+              onGenerateAll: _handleGenerateAll,
+              onGenerateSingle: _handleGenerateSingle,
+            ),
 
             const SizedBox(height: 24),
 
@@ -247,6 +263,33 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen> {
     required int branchId,
     required String termType,
   }) async {
+    final semesters = _termSemesters(termType);
+    final readiness = await _runGenerationPreflight(
+      branchId: branchId,
+      semesters: semesters,
+      divisions: const ['A', 'B'],
+      academicYear: academicYear,
+    );
+
+    if (readiness.isNotReady) {
+      if (!mounted) return;
+      await _showReadinessIssuesDialog(readiness.issues);
+      return;
+    }
+
+    final existing = await _findExistingGeneratedClasses(
+      branchId: branchId,
+      semesters: semesters,
+      divisions: const ['A', 'B'],
+      academicYear: academicYear,
+    );
+
+    if (existing.isNotEmpty) {
+      if (!mounted) return;
+      final confirmed = await _showOverwriteWarning(existing);
+      if (!confirmed) return;
+    }
+
     await ref
         .read(timetableProvider.notifier)
         .generateAllTimetables(
@@ -254,18 +297,329 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen> {
           branchIds: [branchId],
           divisions: const ['A', 'B'],
           termType: termType,
+          force: true,
         );
   }
+
+  Future<void> _handleGenerateSingle({
+    required String academicYear,
+    required int branchId,
+    required int semester,
+    required String division,
+  }) async {
+    final readiness = await _runGenerationPreflight(
+      branchId: branchId,
+      semesters: [semester],
+      divisions: [division],
+      academicYear: academicYear,
+    );
+
+    if (readiness.isNotReady) {
+      if (!mounted) return;
+      await _showReadinessIssuesDialog(readiness.issues);
+      return;
+    }
+
+    final existing = await _findExistingGeneratedClasses(
+      branchId: branchId,
+      semesters: [semester],
+      divisions: [division],
+      academicYear: academicYear,
+    );
+
+    if (existing.isNotEmpty) {
+      if (!mounted) return;
+      final confirmed = await _showOverwriteWarning(existing);
+      if (!confirmed) return;
+    }
+
+    await ref
+        .read(timetableProvider.notifier)
+        .generateTimetable(
+          branchId: branchId,
+          semester: semester,
+          division: division,
+          academicYear: academicYear,
+          force: true,
+        );
+  }
+
+  Future<_GenerationReadiness> _runGenerationPreflight({
+    required int branchId,
+    required List<int> semesters,
+    required List<String> divisions,
+    required String academicYear,
+  }) async {
+    final issues = <String>[];
+
+    if (semesters.isEmpty) {
+      issues.add('Select at least one semester to generate timetable.');
+      return _GenerationReadiness(issues);
+    }
+
+    if (divisions.isEmpty) {
+      issues.add('Select at least one division to generate timetable.');
+      return _GenerationReadiness(issues);
+    }
+
+    var faculty = ref.read(facultyProvider).faculty;
+    if (faculty.isEmpty) {
+      await ref.read(facultyProvider.notifier).loadFaculty(branchId: branchId);
+      faculty = ref.read(facultyProvider).faculty;
+    }
+
+    final activeFaculty = faculty
+        .where((f) => (f.branchId == null || f.branchId == branchId) && f.isActive)
+        .toList();
+
+    if (activeFaculty.isEmpty) {
+      issues.add(
+        'No active teachers found for ${_branchLabel(branchId)}. Add teachers in Teachers management.',
+      );
+    }
+
+    var subjects = ref.read(subjectProvider).subjects;
+    if (subjects.isEmpty) {
+      await ref
+          .read(subjectProvider.notifier)
+          .loadSubjects(branchId: branchId, acadYear: academicYear);
+      subjects = ref.read(subjectProvider).subjects;
+    }
+
+    final branchSubjects = subjects
+        .where((s) => s.branchId == null || s.branchId == branchId)
+        .toList();
+
+    for (final sem in semesters) {
+      final semSubjects = branchSubjects.where((s) => s.semester == sem).toList();
+      if (semSubjects.isEmpty) {
+        issues.add(
+          'No subjects configured for ${_branchLabel(branchId)} Sem $sem. Add subjects before generation.',
+        );
+        continue;
+      }
+
+      final missingCredits = semSubjects
+          .where((s) => s.totalCredits <= 0)
+          .map((s) => s.subjectCode)
+          .toList();
+      if (missingCredits.isNotEmpty) {
+        issues.add(
+          'Set total credits/weekly lectures for Sem $sem subjects: ${missingCredits.join(', ')}.',
+        );
+      }
+
+      final missingFaculty = semSubjects
+          .where(
+            (s) => s.professorAssign == null || s.professorAssign!.trim().isEmpty,
+          )
+          .map((s) => s.subjectCode)
+          .toList();
+      if (missingFaculty.isNotEmpty) {
+        issues.add(
+          'Assign teacher mapping (Professor Assign) for Sem $sem subjects: ${missingFaculty.join(', ')}.',
+        );
+      }
+    }
+
+    var timeslots = ref.read(timeslotProvider).timeslots;
+    if (timeslots.isEmpty) {
+      await ref.read(timeslotProvider.notifier).loadTimeslots();
+      timeslots = ref.read(timeslotProvider).timeslots;
+    }
+    final activeTeachingSlots = timeslots.where((s) => s.active && !s.breakSlot).toList();
+    if (activeTeachingSlots.isEmpty) {
+      issues.add(
+        'No active teaching time slots found. Configure periods in Time Slots.',
+      );
+    }
+
+    if (activeFaculty.isNotEmpty) {
+      final constraintService = ref.read(constraintServiceProvider);
+      final checks = await Future.wait(
+        activeFaculty.map((f) async {
+          try {
+            final c = await constraintService.fetchMyConstraints(f.facultyId);
+            if (c == null) return f.name;
+            if (c.maxLecturesPerDay <= 0 || c.totalLecturesPerWeek <= 0) {
+              return f.name;
+            }
+            return null;
+          } catch (_) {
+            return f.name;
+          }
+        }),
+      );
+
+      final missingConstraintFaculty = checks.whereType<String>().toList();
+      if (missingConstraintFaculty.isNotEmpty) {
+        final preview = missingConstraintFaculty.take(5).join(', ');
+        final suffix = missingConstraintFaculty.length > 5
+            ? ' and ${missingConstraintFaculty.length - 5} more'
+            : '';
+        issues.add(
+          'Faculty constraints are missing/invalid for: $preview$suffix. Configure constraints before generating.',
+        );
+      }
+    }
+
+    return _GenerationReadiness(issues);
+  }
+
+  Future<List<String>> _findExistingGeneratedClasses({
+    required int branchId,
+    required List<int> semesters,
+    required List<String> divisions,
+    required String academicYear,
+  }) async {
+    final timetableService = ref.read(timetableServiceProvider);
+    final existing = <String>[];
+
+    final checks = <Future<void>>[];
+    for (final sem in semesters) {
+      for (final div in divisions) {
+        checks.add(() async {
+          try {
+            final weekly = await timetableService.fetchWeeklyTimetable(
+              branchId: branchId,
+              semester: sem,
+              division: div,
+              academicYear: academicYear,
+            );
+
+            final hasLectures = weekly.any(
+              (day) => day.slots.any((slot) => slot.lectures.isNotEmpty),
+            );
+            if (hasLectures) {
+              existing.add('${_branchLabel(branchId)} Sem $sem Div $div');
+            }
+          } catch (_) {
+            // If one check fails, do not block generation.
+          }
+        }());
+      }
+    }
+
+    await Future.wait(checks);
+    return existing;
+  }
+
+  Future<bool> _showOverwriteWarning(List<String> existingClasses) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Existing Timetable Found'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Timetable already exists for the selected class(es). Regenerating will delete and replace previous assignments.',
+            ),
+            const SizedBox(height: 10),
+            ...existingClasses.take(6).map(
+              (entry) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text('• $entry'),
+              ),
+            ),
+            if (existingClasses.length > 6)
+              Text('• and ${existingClasses.length - 6} more'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete & Regenerate'),
+          ),
+        ],
+      ),
+    );
+
+    return result == true;
+  }
+
+  Future<void> _showReadinessIssuesDialog(List<String> issues) async {
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Configure Before Generating'),
+        content: SizedBox(
+          width: 520,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Please complete the following setup first:',
+                ),
+                const SizedBox(height: 10),
+                ...issues.map(
+                  (issue) => Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Text('• $issue'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<int> _termSemesters(String termType) {
+    return termType == 'odd'
+        ? const [1, 3, 5, 7]
+        : const [2, 4, 6, 8];
+  }
+
+  String _branchLabel(int branchId) {
+    switch (branchId) {
+      case 1:
+        return 'CS';
+      case 2:
+        return 'IT';
+      case 3:
+        return 'EXTC';
+      case 4:
+        return 'Mech';
+      default:
+        return 'Branch $branchId';
+    }
+  }
+}
+
+class _GenerationReadiness {
+  final List<String> issues;
+
+  _GenerationReadiness(this.issues);
+
+  bool get isNotReady => issues.isNotEmpty;
 }
 
 class _StatsRow extends StatelessWidget {
   final int teacherCount;
   final int subjectCount;
+  final int timeslotCount;
   final int timetableCount;
 
   const _StatsRow({
     required this.teacherCount,
     required this.subjectCount,
+    required this.timeslotCount,
     required this.timetableCount,
   });
 
@@ -288,6 +642,13 @@ class _StatsRow extends StatelessWidget {
         ),
         const SizedBox(width: 10),
         _StatCard(
+          label: 'Slots',
+          value: timeslotCount.toString(),
+          icon: Icons.schedule_outlined,
+          color: AppColors.info,
+        ),
+        const SizedBox(width: 10),
+        _StatCard(
           label: 'Days Set',
           value: timetableCount.toString(),
           icon: Icons.grid_view_outlined,
@@ -302,11 +663,13 @@ class _AdminHeroCard extends StatelessWidget {
   final String adminName;
   final int teacherCount;
   final int subjectCount;
+  final int activeTimeslotCount;
 
   const _AdminHeroCard({
     required this.adminName,
     required this.teacherCount,
     required this.subjectCount,
+    required this.activeTimeslotCount,
   });
 
   @override
@@ -353,7 +716,7 @@ class _AdminHeroCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  '$teacherCount teachers, $subjectCount subjects ready for scheduling',
+                  '$teacherCount teachers, $subjectCount subjects, $activeTimeslotCount active slots ready for scheduling',
                   style: const TextStyle(color: Colors.white70),
                 ),
               ],
@@ -534,8 +897,18 @@ class _GenerateTimetableCard extends StatefulWidget {
     required String termType,
   })
   onGenerateAll;
+  final Future<void> Function({
+    required String academicYear,
+    required int branchId,
+    required int semester,
+    required String division,
+  })
+  onGenerateSingle;
 
-  const _GenerateTimetableCard({required this.onGenerateAll});
+  const _GenerateTimetableCard({
+    required this.onGenerateAll,
+    required this.onGenerateSingle,
+  });
 
   @override
   State<_GenerateTimetableCard> createState() => _GenerateTimetableCardState();
@@ -544,7 +917,16 @@ class _GenerateTimetableCard extends StatefulWidget {
 class _GenerateTimetableCardState extends State<_GenerateTimetableCard> {
   int _branchId = 1;
   String _termType = 'even';
-  String _academicYear = '2024-25';
+  int _semester = 3;
+  String _division = 'A';
+  late String _academicYear;
+  _GenerationMode _mode = _GenerationMode.singleClass;
+
+  @override
+  void initState() {
+    super.initState();
+    _academicYear = currentAcademicYear();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -593,13 +975,34 @@ class _GenerateTimetableCardState extends State<_GenerateTimetableCard> {
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     Text(
-                      'Smart conflict-free scheduling',
+                      _mode == _GenerationMode.singleClass
+                          ? 'Generate one class timetable (e.g. Sem 3 Div A)'
+                          : 'Generate full term for A and B divisions',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ],
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 12),
+          SegmentedButton<_GenerationMode>(
+            segments: const [
+              ButtonSegment<_GenerationMode>(
+                value: _GenerationMode.singleClass,
+                label: Text('Single Class'),
+                icon: Icon(Icons.filter_1_rounded),
+              ),
+              ButtonSegment<_GenerationMode>(
+                value: _GenerationMode.termWise,
+                label: Text('Term (A+B)'),
+                icon: Icon(Icons.grid_view_rounded),
+              ),
+            ],
+            selected: {_mode},
+            onSelectionChanged: (set) {
+              setState(() => _mode = set.first);
+            },
           ),
           const SizedBox(height: 16),
           Divider(color: AppColors.divider.withValues(alpha: 0.9)),
@@ -616,75 +1019,136 @@ class _GenerateTimetableCardState extends State<_GenerateTimetableCard> {
                     DropdownMenuItem(value: 3, child: Text('EXTC')),
                     DropdownMenuItem(value: 4, child: Text('Mech')),
                   ],
-                  onChanged: (v) => setState(() => _branchId = v!),
+                  onChanged: (v) => setState(() => _branchId = v ?? 1),
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: _DropdownField<String>(
-                  label: 'Term',
-                  value: _termType,
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'even',
-                      child: Text('Even (2,4,6,8)'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'odd',
-                      child: Text('Odd (1,3,5,7)'),
-                    ),
-                  ],
-                  onChanged: (v) => setState(() => _termType = v ?? 'even'),
+                  label: _mode == _GenerationMode.singleClass
+                      ? 'Division'
+                      : 'Term',
+                  value: _mode == _GenerationMode.singleClass
+                      ? _division
+                      : _termType,
+                  items: _mode == _GenerationMode.singleClass
+                      ? const [
+                          DropdownMenuItem(value: 'A', child: Text('Div A')),
+                          DropdownMenuItem(value: 'B', child: Text('Div B')),
+                        ]
+                      : const [
+                          DropdownMenuItem(
+                            value: 'even',
+                            child: Text('Even (2,4,6,8)'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'odd',
+                            child: Text('Odd (1,3,5,7)'),
+                          ),
+                        ],
+                  onChanged: (v) {
+                    if (_mode == _GenerationMode.singleClass) {
+                      setState(() => _division = v ?? 'A');
+                    } else {
+                      setState(() => _termType = v ?? 'even');
+                    }
+                  },
                 ),
               ),
             ],
           ),
           const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: InputDecorator(
-                  decoration: const InputDecoration(labelText: 'Divisions'),
-                  child: const Text('A and B (fixed)'),
+          if (_mode == _GenerationMode.termWise)
+            Row(
+              children: [
+                Expanded(
+                  child: InputDecorator(
+                    decoration: const InputDecoration(labelText: 'Divisions'),
+                    child: const Text('A and B (fixed)'),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _DropdownField<String>(
-                  label: 'Academic Year',
-                  value: _academicYear,
-                  items: const [
-                    DropdownMenuItem(value: '2024-25', child: Text('2024-25')),
-                    DropdownMenuItem(value: '2025-26', child: Text('2025-26')),
-                  ],
-                  onChanged: (v) => setState(() => _academicYear = v!),
+              ],
+            )
+          else
+            _DropdownField<int>(
+              label: 'Semester',
+              value: _semester,
+              items: const [
+                DropdownMenuItem(value: 1, child: Text('Sem 1')),
+                DropdownMenuItem(value: 2, child: Text('Sem 2')),
+                DropdownMenuItem(value: 3, child: Text('Sem 3')),
+                DropdownMenuItem(value: 4, child: Text('Sem 4')),
+                DropdownMenuItem(value: 5, child: Text('Sem 5')),
+                DropdownMenuItem(value: 6, child: Text('Sem 6')),
+                DropdownMenuItem(value: 7, child: Text('Sem 7')),
+                DropdownMenuItem(value: 8, child: Text('Sem 8')),
+              ],
+              onChanged: (v) => setState(() => _semester = v ?? 3),
+            ),
+            const SizedBox(height: 10),
+            _DropdownField<String>(
+              label: 'Academic Year',
+              value: _academicYear,
+              items: academicYearOptions()
+                  .map((y) => DropdownMenuItem(value: y, child: Text(y)))
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) setState(() => _academicYear = v);
+              },
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 52,
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.auto_awesome_rounded),
+                label: Text(
+                  _mode == _GenerationMode.singleClass
+                      ? 'Generate ${_branchLabel(_branchId)} Sem $_semester Div $_division'
+                      : _termType == 'even'
+                          ? 'Generate Even Semesters (A+B)'
+                          : 'Generate Odd Semesters (A+B)',
+                  style: const TextStyle(fontSize: 16),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 52,
-            child: ElevatedButton.icon(
-              icon: const Icon(Icons.auto_awesome_rounded),
-              label: Text(
-                _termType == 'even'
-                    ? 'Generate Even Semesters (A+B)'
-                    : 'Generate Odd Semesters (A+B)',
-                style: const TextStyle(fontSize: 16),
-              ),
-              onPressed: () => widget.onGenerateAll(
-                academicYear: _academicYear,
-                branchId: _branchId,
-                termType: _termType,
+                onPressed: () {
+                  if (_mode == _GenerationMode.singleClass) {
+                    widget.onGenerateSingle(
+                      academicYear: _academicYear,
+                      branchId: _branchId,
+                      semester: _semester,
+                      division: _division,
+                    );
+                  } else {
+                    widget.onGenerateAll(
+                      academicYear: _academicYear,
+                      branchId: _branchId,
+                      termType: _termType,
+                    );
+                  }
+                },
               ),
             ),
-          ),
-        ],
-      ),
-    );
+          ],
+        ),
+      );
+    }
+
+    String _branchLabel(int branchId) {
+      switch (branchId) {
+        case 1:
+          return 'CS';
+        case 2:
+          return 'IT';
+        case 3:
+          return 'EXTC';
+        case 4:
+          return 'Mech';
+        default:
+          return 'Branch $branchId';
+      }
+    }
   }
-}
+
+  enum _GenerationMode { singleClass, termWise }
 
 class _DropdownField<T> extends StatelessWidget {
   final String label;

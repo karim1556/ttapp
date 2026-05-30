@@ -6,6 +6,7 @@ import '../../../providers/subject_provider.dart';
 import '../../../providers/faculty_provider.dart';
 import '../../../widgets/empty_state_widget.dart';
 import '../../../widgets/loading_overlay_widget.dart';
+import '../../../core/utils/academic_year.dart';
 
 class ManageSubjectsScreen extends ConsumerStatefulWidget {
   const ManageSubjectsScreen({super.key});
@@ -164,7 +165,7 @@ class _ManageSubjectsScreenState extends ConsumerState<ManageSubjectsScreen> {
         existing?.semester?.toString() ?? semesters.first;
 
     int branchId = existing?.branchId ?? 1;
-    String acadYear = existing?.acadYear ?? '2025-26';
+    String acadYear = existing?.acadYear ?? currentAcademicYear();
 
     // Professor assignment - use faculty list
     final facultyList = ref.read(facultyProvider).faculty;
@@ -236,11 +237,9 @@ class _ManageSubjectsScreenState extends ConsumerState<ManageSubjectsScreen> {
                     DropdownButtonFormField<String>(
                       value: acadYear,
                       decoration: const InputDecoration(labelText: 'Academic Year'),
-                      items: const [
-                        DropdownMenuItem(value: '2024-25', child: Text('2024-25')),
-                        DropdownMenuItem(value: '2025-26', child: Text('2025-26')),
-                        DropdownMenuItem(value: '2026-27', child: Text('2026-27')),
-                      ],
+                      items: academicYearOptions()
+                          .map((y) => DropdownMenuItem(value: y, child: Text(y)))
+                          .toList(),
                       onChanged: (v) {
                         if (v != null) acadYear = v;
                       },
