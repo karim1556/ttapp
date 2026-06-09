@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/api/api_client.dart';
 import '../core/api/api_endpoints.dart';
 import '../models/app_notification_item.dart';
+import '../models/time_slot_model.dart';
 import '../models/user_model.dart';
 import 'storage_service.dart';
 
@@ -32,6 +33,7 @@ class NotificationService {
   StreamSubscription<RemoteMessage>? _openedAppSub;
   StreamSubscription<String>? _tokenRefreshSub;
   int? _registeredUserId;
+  final List<Timer> _lectureReminderTimers = [];
 
   final StreamController<AppNotificationItem> _incomingController =
       StreamController<AppNotificationItem>.broadcast();
@@ -320,6 +322,52 @@ class NotificationService {
         body: body,
         payload: payload,
       );
+    }
+  }
+
+  /// Schedule local notifications 10 minutes before each upcoming lecture
+  /// for the rest of today. Cancels any previously scheduled reminders.
+  void scheduleLectureReminders(List<TimeSlotModel> todaySlots) {
+    // Cancel previous timers
+    for (final timer in _lectureReminderTimers) {
+      timer.cancel();
+    }
+    _lectureReminderTimers.clear();
+
+    final now = DateTime.now();
+
+    for (final slot in todaySlots) {
+      if (slot.lectures.isEmpty) continue;
+
+      final lectureTime = DateTime(
+        now.year,
+        now.month,
+        now.day,
+        slot.startTimeHr,
+        slot.startTimeMinutes,
+      );
+      final reminderTime = lectureTime.subtract(const Duration(minutes: 10));
+
+      if (reminderTime.isAfter(now)) {
+        final delay = reminderTime.difference(now);
+        final lecture = slot.lectures.first;
+        final subjectName =
+            lecture.subjectName ?? lecture.subjectCode ?? 'Lecture';
+        final room = lecture.roomNumber ?? 'TBA';
+
+        final timer = Timer(delay, () async {
+          await pushInAppNotification(
+            title: 'Upcoming Lecture in 10 min',
+            body: '$subjectName at ${slot.startTimeDisplay} — Room $room',
+            data: {
+              'type': 'lecture_reminder',
+              'slotId': slot.id,
+            },
+          );
+        });
+
+        _lectureReminderTimers.add(timer);
+      }
     }
   }
 

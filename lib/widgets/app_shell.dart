@@ -18,6 +18,14 @@ class AppShell extends ConsumerWidget {
     AppRoutes.profile,
   ];
 
+  static final _facultyRoutes = [
+    AppRoutes.home,
+    AppRoutes.timetable,
+    AppRoutes.today,
+    AppRoutes.notifications,
+    AppRoutes.profile,
+  ];
+
   static final _regularRoutes = [
     AppRoutes.home,
     AppRoutes.timetable,
@@ -29,7 +37,12 @@ class AppShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isAdmin = ref.watch(isAdminProvider);
-    final routes = isAdmin ? _adminRoutes : _regularRoutes;
+    final isFaculty = ref.watch(isFacultyProvider);
+    final routes = isAdmin
+        ? _adminRoutes
+        : isFaculty
+            ? _facultyRoutes
+            : _regularRoutes;
     final currentLocation = GoRouterState.of(context).matchedLocation;
 
     int currentIndex = routes.indexOf(currentLocation);
@@ -89,33 +102,61 @@ class AppShell extends ConsumerWidget {
                         label: 'Profile',
                       ),
                     ]
-                  : const [
-                      NavigationDestination(
-                        icon: Icon(Icons.home_outlined),
-                        selectedIcon: Icon(Icons.home),
-                        label: 'Home',
-                      ),
-                      NavigationDestination(
-                        icon: Icon(Icons.grid_view_outlined),
-                        selectedIcon: Icon(Icons.grid_view),
-                        label: 'Timetable',
-                      ),
-                      NavigationDestination(
-                        icon: Icon(Icons.today_outlined),
-                        selectedIcon: Icon(Icons.today),
-                        label: 'Today',
-                      ),
-                      NavigationDestination(
-                        icon: Icon(Icons.beach_access_outlined),
-                        selectedIcon: Icon(Icons.beach_access),
-                        label: 'Holidays',
-                      ),
-                      NavigationDestination(
-                        icon: Icon(Icons.person_outlined),
-                        selectedIcon: Icon(Icons.person),
-                        label: 'Profile',
-                      ),
-                    ],
+                  : isFaculty
+                      ? const [
+                          NavigationDestination(
+                            icon: Icon(Icons.home_outlined),
+                            selectedIcon: Icon(Icons.home),
+                            label: 'Home',
+                          ),
+                          NavigationDestination(
+                            icon: Icon(Icons.grid_view_outlined),
+                            selectedIcon: Icon(Icons.grid_view),
+                            label: 'Timetable',
+                          ),
+                          NavigationDestination(
+                            icon: Icon(Icons.today_outlined),
+                            selectedIcon: Icon(Icons.today),
+                            label: 'Today',
+                          ),
+                          NavigationDestination(
+                            icon: Icon(Icons.notifications_outlined),
+                            selectedIcon: Icon(Icons.notifications),
+                            label: 'Alerts',
+                          ),
+                          NavigationDestination(
+                            icon: Icon(Icons.person_outlined),
+                            selectedIcon: Icon(Icons.person),
+                            label: 'Profile',
+                          ),
+                        ]
+                      : const [
+                          NavigationDestination(
+                            icon: Icon(Icons.home_outlined),
+                            selectedIcon: Icon(Icons.home),
+                            label: 'Home',
+                          ),
+                          NavigationDestination(
+                            icon: Icon(Icons.grid_view_outlined),
+                            selectedIcon: Icon(Icons.grid_view),
+                            label: 'Timetable',
+                          ),
+                          NavigationDestination(
+                            icon: Icon(Icons.today_outlined),
+                            selectedIcon: Icon(Icons.today),
+                            label: 'Today',
+                          ),
+                          NavigationDestination(
+                            icon: Icon(Icons.beach_access_outlined),
+                            selectedIcon: Icon(Icons.beach_access),
+                            label: 'Holidays',
+                          ),
+                          NavigationDestination(
+                            icon: Icon(Icons.person_outlined),
+                            selectedIcon: Icon(Icons.person),
+                            label: 'Profile',
+                          ),
+                        ],
             ),
           ),
         ),

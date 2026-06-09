@@ -104,6 +104,11 @@ final routerProvider = Provider<GoRouter>((ref) {
             pageBuilder: (context, state) =>
                 const NoTransitionPage(child: AdminPanelScreen()),
           ),
+          GoRoute(
+            path: AppRoutes.notifications,
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: NotificationsScreen()),
+          ),
         ],
       ),
       GoRoute(
@@ -116,7 +121,15 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutes.facultyConstraints,
-        builder: (context, state) => const FacultyConstraintsScreen(),
+        builder: (context, state) {
+          final isAdmin = ref.read(isAdminProvider);
+          if (!isAdmin) {
+            return const Scaffold(
+              body: Center(child: Text('Access denied')),
+            );
+          }
+          return const FacultyConstraintsScreen();
+        },
       ),
       GoRoute(
         path: AppRoutes.copo,
@@ -137,10 +150,6 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.substitutions,
         builder: (context, state) => const SubstitutionsScreen(),
-      ),
-      GoRoute(
-        path: AppRoutes.notifications,
-        builder: (context, state) => const NotificationsScreen(),
       ),
     ],
     errorBuilder: (context, state) =>

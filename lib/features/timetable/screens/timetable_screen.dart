@@ -59,13 +59,20 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
   }
 
   void _loadTimetable() {
-    ref
-        .read(timetableProvider.notifier)
-        .loadWeeklyTimetable(
-          branchId: _selectedBranch,
-          semester: _selectedSemester,
-          division: _selectedDivision,
-        );
+    final user = ref.read(currentUserProvider);
+    final isFaculty = user?.isFaculty ?? false;
+
+    if (isFaculty && user != null) {
+      ref.read(timetableProvider.notifier).loadFacultyTimetable(user.uid);
+    } else {
+      ref
+          .read(timetableProvider.notifier)
+          .loadWeeklyTimetable(
+            branchId: _selectedBranch,
+            semester: _selectedSemester,
+            division: _selectedDivision,
+          );
+    }
   }
 
   @override
@@ -91,20 +98,19 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Timetable'),
+        title: Text(isAdmin ? 'Timetable' : 'My Timetable'),
         actions: [
           IconButton(
             icon: const Icon(Icons.notifications_outlined),
             tooltip: 'Notifications',
             onPressed: () => context.push(AppRoutes.notifications),
           ),
-          if (isAdmin)
+          if (isAdmin) ...[
             IconButton(
               icon: const Icon(Icons.swap_horiz_rounded),
               tooltip: 'Substitution records',
               onPressed: () => context.push(AppRoutes.substitutions),
             ),
-          if (isAdmin)
             IconButton(
               icon: Icon(
                 _dragEditMode
@@ -127,6 +133,7 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
                 );
               },
             ),
+          ],
           IconButton(
             icon: const Icon(Icons.picture_as_pdf_outlined),
             tooltip: 'Export PDF',
@@ -145,26 +152,20 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
       ),
       body: Column(
         children: [
-          _TimetableSummaryHeader(
-            dayName: selectedDayName,
-            selectedBranch: _selectedBranch != null
-                ? (_branches[_selectedBranch] ?? 'Unknown Branch')
-                : 'All Branches',
-            selectedSemester: _selectedSemester != null
-                ? 'Sem $_selectedSemester'
-                : 'All Semesters',
-            selectedDivision: _selectedDivision != null
-                ? 'Div $_selectedDivision'
-                : 'All Divisions',
-            hasAnyFilter:
-                _selectedBranch != null ||
-                _selectedSemester != null ||
-                _selectedDivision != null,
-            isFocusedClass:
-                _selectedBranch != null &&
-                _selectedSemester != null &&
-                _selectedDivision != null,
-          ),
+          if (isAdmin)
+            _TimetableSummaryHeader(
+              selectedBranch: _selectedBranch != null
+                  ? (_branches[_selectedBranch] ?? 'Unknown Branch')
+                  : 'All Branches',
+              selectedSemester: _selectedSemester != null
+                  ? 'Sem $_selectedSemester'
+                  : 'All Semesters',
+              selectedDivision: _selectedDivision != null
+                  ? 'Div $_selectedDivision'
+                  : 'All Divisions',
+            )
+          else
+            _FacultyTimetableHeader(dayName: selectedDayName),
           const SizedBox(height: 10),
           SizedBox(
             height: 46,
@@ -205,34 +206,35 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
               ),
             ),
           if (isAdmin && _dragEditMode) const SizedBox(height: 10),
-          _FilterBar(
-            selectedBranch: _selectedBranch,
-            selectedSemester: _selectedSemester,
-            selectedDivision: _selectedDivision,
-            branches: _branches,
-            semesters: _semesters,
-            divisions: _divisions,
-            onResetFilters: () {
-              setState(() {
-                _selectedBranch = null;
-                _selectedSemester = null;
-                _selectedDivision = null;
-              });
-              _loadTimetable();
-            },
-            onBranchChanged: (val) {
-              setState(() => _selectedBranch = val);
-              _loadTimetable();
-            },
-            onSemesterChanged: (val) {
-              setState(() => _selectedSemester = val);
-              _loadTimetable();
-            },
-            onDivisionChanged: (val) {
-              setState(() => _selectedDivision = val);
-              _loadTimetable();
-            },
-          ),
+          if (isAdmin)
+            _FilterBar(
+              selectedBranch: _selectedBranch,
+              selectedSemester: _selectedSemester,
+              selectedDivision: _selectedDivision,
+              branches: _branches,
+              semesters: _semesters,
+              divisions: _divisions,
+              onResetFilters: () {
+                setState(() {
+                  _selectedBranch = null;
+                  _selectedSemester = null;
+                  _selectedDivision = null;
+                });
+                _loadTimetable();
+              },
+              onBranchChanged: (val) {
+                setState(() => _selectedBranch = val);
+                _loadTimetable();
+              },
+              onSemesterChanged: (val) {
+                setState(() => _selectedSemester = val);
+                _loadTimetable();
+              },
+              onDivisionChanged: (val) {
+                setState(() => _selectedDivision = val);
+                _loadTimetable();
+              },
+            ),
           Expanded(
             child: isLoading
                 ? const FullScreenLoader(message: 'Loading timetable...')
@@ -245,11 +247,12 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
                 : _DayTimetableView(
                     dayName: selectedDayName,
                     timetableDay: selectedDayData,
-                  onSlotTap: (slot) =>
-                    _showLectureDetail(context, slot, selectedDayName),
+                    onSlotTap: (slot) =>
+                        _showLectureDetail(context, slot, selectedDayName),
                     enableDragDrop: isAdmin && _dragEditMode,
                     onMoveLecture: (lecture, targetSlot) =>
                         _moveLectureToSlot(lecture, targetSlot),
+                    isAdmin: isAdmin,
                   ),
           ),
         ],
@@ -914,38 +917,14 @@ class _SubstitutionDialogState extends ConsumerState<_SubstitutionDialog> {
   }
 }
 
-class _TimetableSummaryHeader extends StatelessWidget {
+// ── Faculty-specific timetable header ────────────────────────────────────────
+class _FacultyTimetableHeader extends StatelessWidget {
   final String dayName;
-  final String selectedBranch;
-  final String selectedSemester;
-  final String selectedDivision;
-  final bool hasAnyFilter;
-  final bool isFocusedClass;
 
-  const _TimetableSummaryHeader({
-    required this.dayName,
-    required this.selectedBranch,
-    required this.selectedSemester,
-    required this.selectedDivision,
-    required this.hasAnyFilter,
-    required this.isFocusedClass,
-  });
+  const _FacultyTimetableHeader({required this.dayName});
 
   @override
   Widget build(BuildContext context) {
-    final currentView =
-        '$selectedBranch • $selectedSemester • $selectedDivision';
-    final scopeTitle = isFocusedClass
-        ? 'Focused timetable view'
-        : hasAnyFilter
-        ? 'Partial filter view'
-        : 'Institute-wide timetable view';
-    final scopeHint = isFocusedClass
-        ? 'You are viewing one exact class timetable.'
-        : hasAnyFilter
-        ? 'Set all three filters for a single class view.'
-        : 'Choose Branch, Semester and Division below to focus on one class.';
-
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -969,7 +948,7 @@ class _TimetableSummaryHeader extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Complete Timetable',
+            'My Timetable',
             style: TextStyle(
               color: Colors.white,
               fontSize: 18,
@@ -978,62 +957,70 @@ class _TimetableSummaryHeader extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            '$dayName overview',
+            '$dayName — Your weekly teaching schedule',
             style: const TextStyle(
               color: Colors.white70,
               fontSize: 13,
               fontWeight: FontWeight.w500,
             ),
           ),
-          const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.16),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.visibility_rounded,
-                      color: Colors.white,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      scopeTitle,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  currentView,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  scopeHint,
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
+        ],
+      ),
+    );
+  }
+}
+
+class _TimetableSummaryHeader extends StatelessWidget {
+  final String selectedBranch;
+  final String selectedSemester;
+  final String selectedDivision;
+
+  const _TimetableSummaryHeader({
+    required this.selectedBranch,
+    required this.selectedSemester,
+    required this.selectedDivision,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final currentView =
+        '$selectedBranch • $selectedSemester • $selectedDivision';
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF5E87F7), Color(0xFF79A1FF)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.22),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.visibility_rounded,
+            color: Colors.white,
+            size: 16,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              currentView,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],
@@ -1320,6 +1307,7 @@ class _DayTimetableView extends StatelessWidget {
   final void Function(TimeSlotModel) onSlotTap;
   final bool enableDragDrop;
   final void Function(LectureAssignmentModel, TimeSlotModel)? onMoveLecture;
+  final bool isAdmin;
 
   const _DayTimetableView({
     required this.dayName,
@@ -1327,6 +1315,7 @@ class _DayTimetableView extends StatelessWidget {
     required this.onSlotTap,
     this.enableDragDrop = false,
     this.onMoveLecture,
+    this.isAdmin = true,
   });
 
   @override
@@ -1361,7 +1350,7 @@ class _DayTimetableView extends StatelessWidget {
 
         Widget card = baseCard;
 
-        if (enableDragDrop) {
+        if (isAdmin && enableDragDrop) {
           card = DragTarget<LectureAssignmentModel>(
             onWillAcceptWithDetails: (details) {
               final incoming = details.data;

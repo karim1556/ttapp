@@ -171,6 +171,9 @@ class _ManageSubjectsScreenState extends ConsumerState<ManageSubjectsScreen> {
     final facultyList = ref.read(facultyProvider).faculty;
     String? professorAssign = existing?.professorAssign;
 
+    // Batch-wise professor assignments for lab subjects (A, B, C)
+    final batchProfessors = <String, String?>{'A': null, 'B': null, 'C': null};
+
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -299,6 +302,63 @@ class _ManageSubjectsScreenState extends ConsumerState<ManageSubjectsScreen> {
                       onChanged: (v) =>
                           setDialogState(() => professorAssign = v),
                     ),
+
+                    // Batch-wise professor assignment for lab subjects
+                    if (isPractical) ...[
+                      const SizedBox(height: 16),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text('Batch-wise Teacher Assignment',
+                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                color: AppColors.labText, fontWeight: FontWeight.w600)),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Lab subjects get 3 batch variants (A, B, C). Assign a teacher for each batch.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppColors.textSecondary),
+                      ),
+                      const SizedBox(height: 8),
+                      for (final batch in ['A', 'B', 'C']) ...[
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            children: [
+                              SizedBox(
+                                width: 40,
+                                child: Text('Batch $batch',
+                                    style: const TextStyle(fontWeight: FontWeight.w600)),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: DropdownButtonFormField<String>(
+                                  value: batchProfessors[batch],
+                                  decoration: InputDecoration(
+                                    labelText: 'Teacher for Batch $batch',
+                                    hintText: 'Select teacher',
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  ),
+                                  isExpanded: true,
+                                  items: [
+                                    const DropdownMenuItem<String>(
+                                      value: null,
+                                      child: Text('-- Same as default --',
+                                          style: TextStyle(color: Colors.grey)),
+                                    ),
+                                    ...facultyList.map((f) => DropdownMenuItem<String>(
+                                          value: f.facultyId.toString(),
+                                          child: Text(f.name ?? 'Unknown'),
+                                        )),
+                                  ],
+                                  onChanged: (v) =>
+                                      setDialogState(() => batchProfessors[batch] = v),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
 
                     const SizedBox(height: 16),
                     Align(
@@ -463,6 +523,13 @@ class _ManageSubjectsScreenState extends ConsumerState<ManageSubjectsScreen> {
                     'theory': theoryCtrl.text.trim(),
                   if (experimentsCtrl.text.trim().isNotEmpty)
                     'experiments': experimentsCtrl.text.trim(),
+                  // Send batch-wise professor assignments for lab subjects
+                  if (isPractical) ...[
+                    'batchProfessors': {
+                      for (final entry in batchProfessors.entries)
+                        if (entry.value != null) entry.key: entry.value,
+                    },
+                  ],
                 };
                 Navigator.pop(ctx);
                 bool success;

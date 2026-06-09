@@ -9,10 +9,9 @@ import '../../../navigation/app_router.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/holiday_provider.dart';
 import '../../../providers/notification_center_provider.dart';
-import '../../../providers/substitution_provider.dart';
 import '../../../providers/timetable_provider.dart';
+import '../../../services/notification_service.dart';
 import '../../../widgets/lecture_card_widget.dart';
-import '../../substitutions/utils/substitution_overlay.dart';
 import '../../timetable/utils/slot_grouping.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
@@ -23,6 +22,8 @@ class DashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+  bool _remindersScheduled = false;
+
   @override
   void initState() {
     super.initState();
@@ -32,9 +33,29 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   void _loadData() {
-    ref.read(timetableProvider.notifier).loadWeeklyTimetable();
+    final user = ref.read(currentUserProvider);
+    final isFaculty = user?.isFaculty ?? false;
+
+    if (isFaculty && user != null) {
+      ref.read(timetableProvider.notifier).loadFacultyTimetable(user.uid);
+    } else {
+      ref.read(timetableProvider.notifier).loadWeeklyTimetable();
+    }
     ref.read(holidayProvider.notifier).loadHolidays();
-    ref.read(substitutionProvider.notifier).loadForDate(DateTime.now());
+  }
+
+  void _scheduleLectureReminders() {
+    final timetableState = ref.read(timetableProvider);
+    final now = DateTime.now();
+    final dayName = DateFormat('EEEE').format(now);
+    final todayDay = _getTodayFromWeekly(
+      timetableState.weeklyTimetable,
+      dayName,
+    );
+    if (todayDay == null) return;
+
+    final notificationService = ref.read(notificationServiceProvider);
+    notificationService.scheduleLectureReminders(todayDay.slots);
   }
 
   @override
@@ -42,7 +63,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final user = ref.watch(currentUserProvider);
     final timetableState = ref.watch(timetableProvider);
     final holidayState = ref.watch(holidayProvider);
-    final substitutionState = ref.watch(substitutionProvider);
     final notificationState = ref.watch(notificationCenterProvider);
     final isAdmin = ref.watch(isAdminProvider);
     final isFaculty = ref.watch(isFacultyProvider);
@@ -53,28 +73,37 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     final todayHoliday = holidayState.todayHoliday;
 
-    // Get today's lectures from weekly timetable
+    // Get today's lectures from timetable
     final todayDay = _getTodayFromWeekly(
       timetableState.weeklyTimetable,
       dayName,
     );
-    final substitutedSlots = todayDay == null
-        ? const <TimeSlotModel>[]
-        : applyApprovedSubstitutionsToSlots(
-            slots: todayDay.slots,
-            substitutions: substitutionState.approvedForDate(now),
-            date: now,
-          );
+
+    // Schedule lecture reminders once for faculty
+    if (isFaculty &&
+        !_remindersScheduled &&
+        timetableState.weeklyTimetable.isNotEmpty &&
+        todayDay != null) {
+      _remindersScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scheduleLectureReminders();
+      });
+    }
     final visibleTodaySlots = todayDay == null
         ? const <TimeSlotModel>[]
-        : collapseConsecutiveLabSlots(substitutedSlots);
+        : collapseConsecutiveLabSlots(todayDay.slots);
 
     // Next upcoming lecture
     final nextLecture = _getNextLecture(visibleTodaySlots);
 
+    // Collect assigned subjects for faculty
+    final assignedSubjects = _collectAssignedSubjects(
+      timetableState.weeklyTimetable,
+    );
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('TT Manager'),
+        title: Text(isFaculty ? 'My Dashboard' : 'TT Manager'),
         actions: [
           IconButton(
             onPressed: () => context.push(AppRoutes.notifications),
@@ -117,6 +146,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               user?.email ?? 'User',
               dayName,
               dateFormatted,
+              isFaculty,
             ),
             const SizedBox(height: 16),
 
@@ -126,9 +156,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               const SizedBox(height: 16),
             ],
 
-            // Next lecture card
-            if (todayHoliday == null) ...[
+            // Next lecture card (faculty only)
+            if (isFaculty && todayHoliday == null) ...[
               _buildNextLectureCard(context, nextLecture),
+              const SizedBox(height: 16),
+            ],
+
+            // Assigned subjects (faculty only)
+            if (isFaculty && assignedSubjects.isNotEmpty) ...[
+              _buildAssignedSubjectsCard(context, assignedSubjects),
               const SizedBox(height: 16),
             ],
 
@@ -146,7 +182,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               children: [
                 _QuickActionCard(
                   icon: Icons.grid_view_rounded,
-                  label: 'Weekly\nTimetable',
+                  label: 'My\nTimetable',
                   color: AppColors.primary,
                   onTap: () => context.go(AppRoutes.timetable),
                 ),
@@ -156,35 +192,33 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   color: AppColors.success,
                   onTap: () => context.go(AppRoutes.today),
                 ),
-                _QuickActionCard(
-                  icon: Icons.beach_access_rounded,
-                  label: 'Upcoming\nHolidays',
-                  color: AppColors.error,
-                  onTap: () => isAdmin
-                      ? context.go(AppRoutes.adminPanel)
-                      : context.go(AppRoutes.holidays),
-                ),
-                if (isAdmin)
+                if (isAdmin) ...[
                   _QuickActionCard(
                     icon: Icons.admin_panel_settings_rounded,
                     label: 'Admin\nPanel',
                     color: AppColors.warning,
                     onTap: () => context.go(AppRoutes.adminPanel),
-                  )
-                else if (isFaculty)
-                  _QuickActionCard(
-                    icon: Icons.tune_rounded,
-                    label: 'My\nConstraints',
-                    color: AppColors.secondary,
-                    onTap: () => context.push(AppRoutes.facultyConstraints),
-                  )
-                else
+                  ),
                   _QuickActionCard(
                     icon: Icons.beach_access_rounded,
-                    label: 'Holidays',
-                    color: AppColors.warning,
+                    label: 'Upcoming\nHolidays',
+                    color: AppColors.error,
                     onTap: () => context.go(AppRoutes.holidays),
                   ),
+                ] else ...[
+                  _QuickActionCard(
+                    icon: Icons.book_outlined,
+                    label: 'My\nSubjects',
+                    color: AppColors.secondary,
+                    onTap: () => context.go(AppRoutes.timetable),
+                  ),
+                  _QuickActionCard(
+                    icon: Icons.notifications_active_outlined,
+                    label: 'Lecture\nReminders',
+                    color: AppColors.error,
+                    onTap: () => context.push(AppRoutes.notifications),
+                  ),
+                ],
               ],
             ),
 
@@ -219,8 +253,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     ),
             ],
 
-            // Upcoming holidays preview
-            if (holidayState.upcomingHolidays.isNotEmpty) ...[
+            // Upcoming holidays preview (admin only on dashboard)
+            if (isAdmin && holidayState.upcomingHolidays.isNotEmpty) ...[
               const SizedBox(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -229,11 +263,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     'Upcoming Holidays',
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
-                  if (!isAdmin)
-                    TextButton(
-                      onPressed: () => context.go(AppRoutes.holidays),
-                      child: const Text('View All'),
-                    ),
+                  TextButton(
+                    onPressed: () => context.go(AppRoutes.holidays),
+                    child: const Text('View All'),
+                  ),
                 ],
               ),
               const SizedBox(height: 8),
@@ -249,7 +282,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
-  TimetableDay? _getTodayFromWeekly(List<TimetableDay> weekly, String dayName) {
+  TimetableDay? _getTodayFromWeekly(
+    List<TimetableDay> weekly,
+    String dayName,
+  ) {
     try {
       return weekly.firstWhere(
         (d) => d.dayName.toLowerCase() == dayName.toLowerCase(),
@@ -277,11 +313,130 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     return null;
   }
 
+  List<_SubjectSummary> _collectAssignedSubjects(List<TimetableDay> weekly) {
+    final map = <String, _SubjectSummary>{};
+    for (final day in weekly) {
+      for (final slot in day.slots) {
+        for (final lec in slot.lectures) {
+          final code = lec.subjectCode ?? '';
+          if (code.isEmpty) continue;
+          map.putIfAbsent(
+            code,
+            () => _SubjectSummary(
+              code: code,
+              name: lec.subjectName ?? code,
+              type: lec.typeOfLecture ?? 'Lecture',
+              room: lec.roomNumber,
+            ),
+          );
+        }
+      }
+    }
+    return map.values.toList();
+  }
+
+  Widget _buildAssignedSubjectsCard(
+    BuildContext context,
+    List<_SubjectSummary> subjects,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.divider),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.secondary.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.menu_book_outlined,
+                  color: AppColors.secondary,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'Assigned Subjects',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ...subjects.map(
+            (s) => Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      s.code,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      s.name,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Text(
+                    s.type,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildGreetingCard(
     BuildContext context,
     String email,
     String day,
     String date,
+    bool isFaculty,
   ) {
     final hour = DateTime.now().hour;
     final greeting = hour < 12
@@ -348,6 +503,27 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         fontSize: 13,
                       ),
                     ),
+                    if (isFaculty) ...[
+                      const SizedBox(width: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: const Text(
+                          'Faculty',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ],
@@ -495,23 +671,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   'Room ${lecture!.roomNumber}',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
-                if (lecture.facultyName != null) ...[
-                  const SizedBox(width: 12),
-                  const Icon(
-                    Icons.person_outlined,
-                    size: 14,
-                    color: AppColors.textSecondary,
-                  ),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      lecture.facultyName!,
-                      style: Theme.of(context).textTheme.bodySmall,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
               ],
             ),
           ],
@@ -547,6 +706,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       ),
     );
   }
+}
+
+class _SubjectSummary {
+  final String code;
+  final String name;
+  final String type;
+  final String? room;
+  const _SubjectSummary({
+    required this.code,
+    required this.name,
+    required this.type,
+    this.room,
+  });
 }
 
 class _QuickActionCard extends StatelessWidget {

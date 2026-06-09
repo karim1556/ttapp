@@ -4,13 +4,12 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../navigation/app_router.dart';
+import '../../../providers/auth_provider.dart';
 import '../../../providers/holiday_provider.dart';
-import '../../../providers/substitution_provider.dart';
 import '../../../providers/timetable_provider.dart';
 import '../../../widgets/empty_state_widget.dart';
 import '../../../widgets/loading_overlay_widget.dart';
 import '../../../widgets/lecture_card_widget.dart';
-import '../../substitutions/utils/substitution_overlay.dart';
 import '../../timetable/widgets/lecture_detail_sheet.dart';
 import '../../timetable/utils/slot_grouping.dart';
 import '../../../models/time_slot_model.dart';
@@ -27,17 +26,27 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(timetableProvider.notifier).loadWeeklyTimetable();
-      ref.read(holidayProvider.notifier).loadHolidays();
-      ref.read(substitutionProvider.notifier).loadForDate(DateTime.now());
+      _loadData();
     });
+  }
+
+  void _loadData() {
+    final user = ref.read(currentUserProvider);
+    final isFaculty = user?.isFaculty ?? false;
+
+    if (isFaculty && user != null) {
+      ref.read(timetableProvider.notifier).loadFacultyTimetable(user.uid);
+    } else {
+      ref.read(timetableProvider.notifier).loadWeeklyTimetable();
+    }
+    ref.read(holidayProvider.notifier).loadHolidays();
   }
 
   @override
   Widget build(BuildContext context) {
     final timetableState = ref.watch(timetableProvider);
     final holidayState = ref.watch(holidayProvider);
-    final substitutionState = ref.watch(substitutionProvider);
+    final isAdmin = ref.watch(isAdminProvider);
 
     final now = DateTime.now();
     final dayName = DateFormat('EEEE').format(now);
@@ -50,17 +59,9 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
         .where((d) => d.dayName.toLowerCase() == dayName.toLowerCase())
         .firstOrNull;
 
-    final substitutedSlots = todayDay == null
-      ? const <TimeSlotModel>[]
-      : applyApprovedSubstitutionsToSlots(
-        slots: todayDay.slots,
-        substitutions: substitutionState.approvedForDate(now),
-        date: now,
-        );
-
     final visibleSlots = todayDay == null
         ? const <TimeSlotModel>[]
-      : collapseConsecutiveLabSlots(substitutedSlots);
+        : collapseConsecutiveLabSlots(todayDay.slots);
 
     final isLoading =
         timetableState.status == TimetableStatus.loading &&
@@ -68,7 +69,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Day'),
+        title: Text(isAdmin ? 'Today' : 'My Day'),
         actions: [
           IconButton(
             icon: const Icon(Icons.notifications_outlined),
@@ -76,18 +77,14 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.refresh_outlined),
-            onPressed: () =>
-                ref.read(timetableProvider.notifier).loadWeeklyTimetable(),
+            onPressed: _loadData,
           ),
         ],
       ),
       body: isLoading
           ? const FullScreenLoader(message: 'Loading schedule...')
           : RefreshIndicator(
-              onRefresh: () async {
-                ref.read(timetableProvider.notifier).loadWeeklyTimetable();
-                ref.read(substitutionProvider.notifier).loadForDate(now);
-              },
+              onRefresh: () async => _loadData(),
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
@@ -117,6 +114,14 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                       color: AppColors.error,
                     ),
                     const SizedBox(height: 16),
+                  ] else if (isAdmin) ...[
+                    // Admin should use Timetable screen instead
+                    EmptyStateWidget(
+                      icon: Icons.admin_panel_settings_outlined,
+                      title: 'Admin View',
+                      subtitle:
+                          'Use the Timetable screen to view all class timetables with year, branch, and division details.',
+                    ),
                   ] else if (visibleSlots.isEmpty) ...[
                     EmptyStateWidget(
                       icon: Icons.event_busy_outlined,
