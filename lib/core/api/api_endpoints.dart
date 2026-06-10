@@ -21,6 +21,10 @@ class ApiEndpoints {
   static const String timetableById = '/timetable'; // append /:id
   static const String timetableRoomWeekly = '/timetable/room'; // append /:room/weekly
   static const String timetableClassroomUsageReport = '/timetable/reports/classroom-usage';
+  static const String temporaryTimetable = '/timetable/temporary';
+  static const String temporaryTimetableGenerate = '/timetable/temporary/generate';
+  static const String temporaryTimetablePdf = '/timetable/temporary/pdf';
+  static const String temporaryTimetableBulk = '/timetable/temporary/bulk';
 
   // Time Slots
   static const String timeSlots = '/timetable/slots';

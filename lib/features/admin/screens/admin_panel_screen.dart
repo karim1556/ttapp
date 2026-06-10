@@ -169,6 +169,13 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen> {
                   color: const Color(0xFF6D4DF2),
                   onTap: () => context.push(AppRoutes.manageTimeslots),
                 ),
+                _AdminActionTile(
+                  icon: Icons.date_range_outlined,
+                  title: 'Temporary TT',
+                  subtitle: 'Events & overrides',
+                  color: Colors.deepOrange,
+                  onTap: () => context.push(AppRoutes.manageTemporaryTimetable),
+                ),
               ],
             ),
 

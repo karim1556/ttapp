@@ -73,10 +73,28 @@ class TimetableService {
         ? raw
         : raw is Map<String, dynamic>
             ? raw.entries
-                .map((e) => {
-                      'dayName': e.key,
-                      ...(e.value as Map<String, dynamic>),
-                    })
+                .map((e) {
+                  final dayVal = e.value as Map<String, dynamic>;
+                  final rawSlots = dayVal['slots'];
+                  List<dynamic> slotList = [];
+                  if (rawSlots is List) {
+                    slotList = rawSlots;
+                  } else if (rawSlots is Map<String, dynamic>) {
+                    slotList = rawSlots.values.map((s) {
+                      final sMap = s as Map<String, dynamic>;
+                      final slotDetails = sMap['slot'] as Map<String, dynamic>? ?? {};
+                      final lecs = sMap['lectures'] as List<dynamic>? ?? [];
+                      return {
+                        ...slotDetails,
+                        'lectures': lecs,
+                      };
+                    }).toList();
+                  }
+                  return {
+                    'timetable': dayVal['timetable'],
+                    'slots': slotList,
+                  };
+                })
                 .toList()
             : [];
     return days

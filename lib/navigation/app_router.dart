@@ -18,6 +18,7 @@ import '../features/admin/screens/manage_timeslots_screen.dart';
 import '../features/admin/screens/room_reports_screen.dart';
 import '../features/notifications/screens/notifications_screen.dart';
 import '../features/substitutions/screens/substitutions_screen.dart';
+import '../features/admin/screens/manage_temporary_timetable_screen.dart';
 import '../widgets/app_shell.dart';
 
 // Route names
@@ -39,6 +40,7 @@ class AppRoutes {
   static const String roomReports = '/admin/rooms/reports';
   static const String substitutions = '/substitutions';
   static const String notifications = '/notifications';
+  static const String manageTemporaryTimetable = '/admin/temporary-timetable';
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -150,6 +152,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.substitutions,
         builder: (context, state) => const SubstitutionsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.manageTemporaryTimetable,
+        builder: (context, state) => const ManageTemporaryTimetableScreen(),
       ),
     ],
     errorBuilder: (context, state) =>

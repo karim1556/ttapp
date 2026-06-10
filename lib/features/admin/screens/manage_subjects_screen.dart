@@ -524,12 +524,11 @@ class _ManageSubjectsScreenState extends ConsumerState<ManageSubjectsScreen> {
                   if (experimentsCtrl.text.trim().isNotEmpty)
                     'experiments': experimentsCtrl.text.trim(),
                   // Send batch-wise professor assignments for lab subjects
-                  if (isPractical) ...[
+                  if (isPractical)
                     'batchProfessors': {
                       for (final entry in batchProfessors.entries)
                         if (entry.value != null) entry.key: entry.value,
                     },
-                  ],
                 };
                 Navigator.pop(ctx);
                 bool success;
