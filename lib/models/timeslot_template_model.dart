@@ -1,5 +1,8 @@
 class TimeSlotTemplateModel {
   final int id;
+  final int? branchId;
+  final int? semester;
+  final String? division;
   final String? label;
   final int startTimeHr;
   final int startTimeMinutes;
@@ -11,6 +14,9 @@ class TimeSlotTemplateModel {
 
   TimeSlotTemplateModel({
     required this.id,
+    this.branchId,
+    this.semester,
+    this.division,
     this.label,
     required this.startTimeHr,
     this.startTimeMinutes = 0,
@@ -34,6 +40,9 @@ class TimeSlotTemplateModel {
   factory TimeSlotTemplateModel.fromJson(Map<String, dynamic> json) {
     return TimeSlotTemplateModel(
       id: _parseInt(json['id']) ?? 0,
+      branchId: _parseInt(json['branch_id']) ?? _parseInt(json['branchId']),
+      semester: _parseInt(json['semester']),
+      division: json['division']?.toString(),
       label: json['label']?.toString(),
       startTimeHr: _parseInt(json['startTimeHr']) ?? _parseInt(json['start_time_hr']) ?? 8,
       startTimeMinutes: _parseInt(json['startTimeMinutes']) ?? _parseInt(json['start_time_minutes']) ?? 0,
@@ -48,6 +57,9 @@ class TimeSlotTemplateModel {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'branch_id': branchId,
+      'semester': semester,
+      'division': division,
       'label': label,
       'startTimeHr': startTimeHr,
       'startTimeMinutes': startTimeMinutes,
@@ -61,6 +73,9 @@ class TimeSlotTemplateModel {
 
   TimeSlotTemplateModel copyWith({
     int? id,
+    int? branchId,
+    int? semester,
+    String? division,
     String? label,
     int? startTimeHr,
     int? startTimeMinutes,
@@ -72,6 +87,9 @@ class TimeSlotTemplateModel {
   }) {
     return TimeSlotTemplateModel(
       id: id ?? this.id,
+      branchId: branchId ?? this.branchId,
+      semester: semester ?? this.semester,
+      division: division ?? this.division,
       label: label ?? this.label,
       startTimeHr: startTimeHr ?? this.startTimeHr,
       startTimeMinutes: startTimeMinutes ?? this.startTimeMinutes,

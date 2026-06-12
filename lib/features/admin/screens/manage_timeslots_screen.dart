@@ -16,12 +16,24 @@ class ManageTimeslotsScreen extends ConsumerStatefulWidget {
 
 class _ManageTimeslotsScreenState
     extends ConsumerState<ManageTimeslotsScreen> {
+  int? _selectedBranch;
+  int? _selectedSemester;
+  String? _selectedDivision;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(timeslotProvider.notifier).loadTimeslots();
+      _loadTimeslots();
     });
+  }
+
+  void _loadTimeslots() {
+    ref.read(timeslotProvider.notifier).loadTimeslots(
+          branchId: _selectedBranch,
+          semester: _selectedSemester,
+          division: _selectedDivision,
+        );
   }
 
   @override
@@ -38,8 +50,7 @@ class _ManageTimeslotsScreenState
           actions: [
             IconButton(
               icon: const Icon(Icons.refresh_outlined),
-              onPressed: () =>
-                  ref.read(timeslotProvider.notifier).loadTimeslots(),
+              onPressed: _loadTimeslots,
             ),
           ],
         ),
@@ -97,6 +108,85 @@ class _ManageTimeslotsScreenState
               ),
             ),
 
+            // Filters Card
+            Container(
+              margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<int?>(
+                      value: _selectedBranch,
+                      decoration: const InputDecoration(
+                        labelText: 'Department',
+                        contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: null, child: Text('Global / All')),
+                        DropdownMenuItem(value: 1, child: Text('CS')),
+                        DropdownMenuItem(value: 2, child: Text('IT')),
+                        DropdownMenuItem(value: 3, child: Text('EXTC')),
+                        DropdownMenuItem(value: 4, child: Text('Mech')),
+                      ],
+                      onChanged: (v) {
+                        setState(() => _selectedBranch = v);
+                        _loadTimeslots();
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: DropdownButtonFormField<int?>(
+                      value: _selectedSemester,
+                      decoration: const InputDecoration(
+                        labelText: 'Semester',
+                        contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                      ),
+                      items: [
+                        const DropdownMenuItem(value: null, child: Text('All Sem')),
+                        ...List.generate(8, (i) => DropdownMenuItem(value: i + 1, child: Text('Sem ${i + 1}'))),
+                      ],
+                      onChanged: (v) {
+                        setState(() => _selectedSemester = v);
+                        _loadTimeslots();
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: DropdownButtonFormField<String?>(
+                      value: _selectedDivision,
+                      decoration: const InputDecoration(
+                        labelText: 'Division',
+                        contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: null, child: Text('All Div')),
+                        DropdownMenuItem(value: 'A', child: Text('Div A')),
+                        DropdownMenuItem(value: 'B', child: Text('Div B')),
+                        DropdownMenuItem(value: 'C', child: Text('Div C')),
+                      ],
+                      onChanged: (v) {
+                        setState(() => _selectedDivision = v);
+                        _loadTimeslots();
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
             // Error banner
             if (state.errorMessage != null)
               Container(
@@ -121,7 +211,7 @@ class _ManageTimeslotsScreenState
                           icon: Icons.schedule_outlined,
                           title: 'No time slots configured',
                           subtitle:
-                              'Tap "Load Defaults" to seed the standard 8-period day, or add slots manually.',
+                              'Try adjusting your filters, load defaults, or add a slot manually.',
                         )
                       : ReorderableListView.builder(
                           padding:
@@ -163,14 +253,19 @@ class _ManageTimeslotsScreenState
       }
     }
     // Reload to reflect new order
-    await notifier.loadTimeslots();
+    _loadTimeslots();
   }
 
   Future<void> _showTimeslotDialog(
       BuildContext context, TimeSlotTemplateModel? existing) async {
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (_) => _TimeslotFormDialog(slot: existing),
+      builder: (_) => _TimeslotFormDialog(
+        slot: existing,
+        defaultBranchId: _selectedBranch,
+        defaultSemester: _selectedSemester,
+        defaultDivision: _selectedDivision,
+      ),
     );
     if (result == null) return;
     if (!mounted) return;
@@ -180,6 +275,7 @@ class _ManageTimeslotsScreenState
     } else {
       await notifier.updateTimeslot(existing.id, result);
     }
+    _loadTimeslots();
   }
 
   Future<void> _confirmSeedDefaults(BuildContext context) async {
@@ -205,6 +301,7 @@ class _ManageTimeslotsScreenState
     );
     if (ok == true && mounted) {
       await ref.read(timeslotProvider.notifier).seedDefaults();
+      _loadTimeslots();
     }
   }
 
@@ -235,6 +332,7 @@ class _ManageTimeslotsScreenState
     );
     if (ok == true && mounted) {
       await ref.read(timeslotProvider.notifier).deleteTimeslot(slot.id);
+      _loadTimeslots();
     }
   }
 }
@@ -291,7 +389,68 @@ class _TimeslotCard extends StatelessWidget {
             ],
           ],
         ),
-        subtitle: Text(slot.timeRange),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(slot.timeRange),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                if (slot.branchId != null)
+                  Container(
+                    margin: const EdgeInsets.only(right: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      _branchName(slot.branchId!),
+                      style: const TextStyle(color: Colors.blue, fontSize: 10, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                if (slot.semester != null)
+                  Container(
+                    margin: const EdgeInsets.only(right: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.purple.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      'Sem ${slot.semester}',
+                      style: const TextStyle(color: Colors.purple, fontSize: 10, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                if (slot.division != null)
+                  Container(
+                    margin: const EdgeInsets.only(right: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.teal.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      'Div ${slot.division}',
+                      style: const TextStyle(color: Colors.teal, fontSize: 10, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                if (slot.branchId == null && slot.semester == null && slot.division == null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      'Global / All Dept',
+                      style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -312,12 +471,30 @@ class _TimeslotCard extends StatelessWidget {
       ),
     );
   }
+
+  static String _branchName(int id) {
+    switch (id) {
+      case 1: return 'CS';
+      case 2: return 'IT';
+      case 3: return 'EXTC';
+      case 4: return 'Mech';
+      default: return 'Branch $id';
+    }
+  }
 }
 
 class _TimeslotFormDialog extends StatefulWidget {
   final TimeSlotTemplateModel? slot;
+  final int? defaultBranchId;
+  final int? defaultSemester;
+  final String? defaultDivision;
 
-  const _TimeslotFormDialog({this.slot});
+  const _TimeslotFormDialog({
+    this.slot,
+    this.defaultBranchId,
+    this.defaultSemester,
+    this.defaultDivision,
+  });
 
   @override
   State<_TimeslotFormDialog> createState() => _TimeslotFormDialogState();
@@ -334,6 +511,10 @@ class _TimeslotFormDialogState extends State<_TimeslotFormDialog> {
   bool _isBreak = false;
   bool _isActive = true;
 
+  int? _branchId;
+  int? _semester;
+  String? _division;
+
   @override
   void initState() {
     super.initState();
@@ -347,6 +528,10 @@ class _TimeslotFormDialogState extends State<_TimeslotFormDialog> {
     _endMin = s?.endTimeMinutes ?? 0;
     _isBreak = s?.breakSlot ?? false;
     _isActive = (s?.isActive ?? 1) != 0;
+
+    _branchId = s?.branchId ?? widget.defaultBranchId;
+    _semester = s?.semester ?? widget.defaultSemester;
+    _division = s?.division ?? widget.defaultDivision;
   }
 
   @override
@@ -375,6 +560,49 @@ class _TimeslotFormDialogState extends State<_TimeslotFormDialog> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                DropdownButtonFormField<int?>(
+                  value: _branchId,
+                  decoration: const InputDecoration(labelText: 'Department / Branch'),
+                  items: const [
+                    DropdownMenuItem(value: null, child: Text('Global / All (Default)')),
+                    DropdownMenuItem(value: 1, child: Text('CS')),
+                    DropdownMenuItem(value: 2, child: Text('IT')),
+                    DropdownMenuItem(value: 3, child: Text('EXTC')),
+                    DropdownMenuItem(value: 4, child: Text('Mech')),
+                  ],
+                  onChanged: (v) => setState(() => _branchId = v),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<int?>(
+                        value: _semester,
+                        decoration: const InputDecoration(labelText: 'Semester'),
+                        items: [
+                          const DropdownMenuItem(value: null, child: Text('Global / All')),
+                          ...List.generate(8, (i) => DropdownMenuItem(value: i + 1, child: Text('Sem ${i + 1}'))),
+                        ],
+                        onChanged: (v) => setState(() => _semester = v),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: DropdownButtonFormField<String?>(
+                        value: _division,
+                        decoration: const InputDecoration(labelText: 'Division'),
+                        items: const [
+                          DropdownMenuItem(value: null, child: Text('Global / All')),
+                          DropdownMenuItem(value: 'A', child: Text('Div A')),
+                          DropdownMenuItem(value: 'B', child: Text('Div B')),
+                          DropdownMenuItem(value: 'C', child: Text('Div C')),
+                        ],
+                        onChanged: (v) => setState(() => _division = v),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
                 TextFormField(
                   controller: _labelCtrl,
                   decoration:
@@ -498,6 +726,9 @@ class _TimeslotFormDialogState extends State<_TimeslotFormDialog> {
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
     Navigator.pop(context, {
+      'branch_id': _branchId,
+      'semester': _semester,
+      'division': _division,
       'label': _labelCtrl.text.trim().isEmpty ? null : _labelCtrl.text.trim(),
       'startTimeHr': _startHr,
       'startTimeMinutes': _startMin,

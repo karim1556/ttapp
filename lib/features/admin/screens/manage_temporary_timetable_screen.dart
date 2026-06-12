@@ -453,6 +453,12 @@ class _TemporarySlotCard extends ConsumerWidget {
       orElse: () => FacultyModel(facultyId: 0, name: 'N/A', email: ''),
     );
 
+    final subjects = ref.watch(subjectProvider).subjects;
+    final subjectObj = subjects.firstWhere(
+      (s) => s.subjectCode == slot.subjectCode,
+      orElse: () => SubjectModel(id: 0, subjectCode: '', subjectName: '', totalCredits: 0),
+    );
+
     final formattedDate =
         DateFormat('EEE, MMM d, yyyy').format(slot.date);
     final startH = slot.startTimeHr.toString().padLeft(2, '0');
@@ -464,7 +470,9 @@ class _TemporarySlotCard extends ConsumerWidget {
     final isLab = slot.typeOfLecture == 'Lab';
     final accentColor = isLab ? const Color(0xFF5E35B1) : const Color(0xFF1565C0);
 
-    final subjectTitle = slot.subjectCode ?? slot.eventName ?? 'Special Event';
+    final subjectTitle = subjectObj.subjectName != null && subjectObj.subjectName!.isNotEmpty
+        ? subjectObj.subjectName!
+        : (slot.subjectCode ?? 'Special Event');
     final occasionLabel = slot.eventName;
 
     return Container(
@@ -659,7 +667,7 @@ class _AddSlotFormDialogState
       end: DateTime.now().add(const Duration(days: 1)),
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(timeslotProvider.notifier).loadTimeslots();
+      ref.read(timeslotProvider.notifier).loadTimeslots(branchId: widget.branchId);
       ref.read(facultyProvider.notifier).loadFaculty();
       ref.read(roomProvider.notifier).loadRooms();
       ref

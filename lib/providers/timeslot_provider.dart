@@ -33,10 +33,14 @@ class TimeslotNotifier extends StateNotifier<TimeslotState> {
 
   TimeslotNotifier(this._timeslotService) : super(const TimeslotState());
 
-  Future<void> loadTimeslots() async {
+  Future<void> loadTimeslots({int? branchId, int? semester, String? division}) async {
     state = state.copyWith(status: TimeslotStatus.loading);
     try {
-      final list = await _timeslotService.fetchAllTimeslots();
+      final list = await _timeslotService.fetchAllTimeslots(
+        branchId: branchId,
+        semester: semester,
+        division: division,
+      );
       state = state.copyWith(status: TimeslotStatus.loaded, timeslots: list);
     } on Exception catch (e) {
       state = state.copyWith(

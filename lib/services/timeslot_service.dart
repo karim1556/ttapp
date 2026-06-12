@@ -8,8 +8,15 @@ class TimeslotService {
 
   TimeslotService(this._apiClient);
 
-  Future<List<TimeSlotTemplateModel>> fetchAllTimeslots() async {
-    final response = await _apiClient.get(ApiEndpoints.timeslotTemplates);
+  Future<List<TimeSlotTemplateModel>> fetchAllTimeslots({int? branchId, int? semester, String? division}) async {
+    final Map<String, dynamic> params = {};
+    if (branchId != null) params['branchId'] = branchId.toString();
+    if (semester != null) params['semester'] = semester.toString();
+    if (division != null) params['division'] = division;
+    final response = await _apiClient.get(
+      ApiEndpoints.timeslotTemplates,
+      queryParameters: params.isEmpty ? null : params,
+    );
     final body = response.data as Map<String, dynamic>;
     final raw = body['data'];
     final List<dynamic> list = raw is List ? raw : [];

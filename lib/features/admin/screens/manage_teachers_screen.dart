@@ -5,6 +5,7 @@ import '../../../models/faculty_model.dart';
 import '../../../providers/faculty_provider.dart';
 import '../../../widgets/empty_state_widget.dart';
 import '../../../widgets/loading_overlay_widget.dart';
+import '../../../providers/subject_provider.dart';
 
 class ManageTeachersScreen extends ConsumerStatefulWidget {
   const ManageTeachersScreen({super.key});
@@ -17,12 +18,15 @@ class ManageTeachersScreen extends ConsumerStatefulWidget {
 class _ManageTeachersScreenState extends ConsumerState<ManageTeachersScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
+  int? _selectedBranch;
+  int? _selectedSemester;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(facultyProvider.notifier).loadFaculty();
+      ref.read(subjectProvider.notifier).loadSubjects();
     });
   }
 
@@ -35,14 +39,29 @@ class _ManageTeachersScreenState extends ConsumerState<ManageTeachersScreen> {
   @override
   Widget build(BuildContext context) {
     final facultyState = ref.watch(facultyProvider);
-    final isLoading = facultyState.status == FacultyStatus.loading &&
-        facultyState.faculty.isEmpty;
+    final subjects = ref.watch(subjectProvider).subjects;
+    
+    final isLoading = (facultyState.status == FacultyStatus.loading && facultyState.faculty.isEmpty) ||
+                      (ref.watch(subjectProvider).status == SubjectStatus.loading && subjects.isEmpty);
 
     final filtered = facultyState.faculty.where((f) {
       final q = _searchQuery.toLowerCase();
-      return q.isEmpty ||
+      final matchesQuery = q.isEmpty ||
           f.name.toLowerCase().contains(q) ||
           f.email.toLowerCase().contains(q);
+      
+      final matchesBranch = _selectedBranch == null || f.branchId == _selectedBranch;
+      
+      bool matchesSem = true;
+      if (_selectedSemester != null) {
+        final teacherSubjects = subjects.where((s) {
+          final profId = int.tryParse(s.professorAssign ?? '');
+          return profId == f.facultyId && s.semester == _selectedSemester;
+        });
+        matchesSem = teacherSubjects.isNotEmpty;
+      }
+      
+      return matchesQuery && matchesBranch && matchesSem;
     }).toList();
 
     return Scaffold(
@@ -51,7 +70,10 @@ class _ManageTeachersScreenState extends ConsumerState<ManageTeachersScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh_outlined),
-            onPressed: () => ref.read(facultyProvider.notifier).loadFaculty(),
+            onPressed: () {
+              ref.read(facultyProvider.notifier).loadFaculty();
+              ref.read(subjectProvider.notifier).loadSubjects();
+            },
           ),
         ],
       ),
@@ -62,16 +84,70 @@ class _ManageTeachersScreenState extends ConsumerState<ManageTeachersScreen> {
       ),
       body: Column(
         children: [
-          // Search bar
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              controller: _searchController,
-              decoration: const InputDecoration(
-                hintText: 'Search by name or email...',
-                prefixIcon: Icon(Icons.search_outlined),
-              ),
-              onChanged: (v) => setState(() => _searchQuery = v),
+          // Search & Filters Card
+          Container(
+            margin: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                TextField(
+                  controller: _searchController,
+                  decoration: const InputDecoration(
+                    hintText: 'Search by name or email...',
+                    prefixIcon: Icon(Icons.search_outlined),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  ),
+                  onChanged: (v) => setState(() => _searchQuery = v),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<int?>(
+                        value: _selectedBranch,
+                        decoration: const InputDecoration(
+                          labelText: 'Department',
+                          contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: null, child: Text('All Dept')),
+                          DropdownMenuItem(value: 1, child: Text('CS')),
+                          DropdownMenuItem(value: 2, child: Text('IT')),
+                          DropdownMenuItem(value: 3, child: Text('EXTC')),
+                          DropdownMenuItem(value: 4, child: Text('Mech')),
+                        ],
+                        onChanged: (v) => setState(() => _selectedBranch = v),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: DropdownButtonFormField<int?>(
+                        value: _selectedSemester,
+                        decoration: const InputDecoration(
+                          labelText: 'Semester',
+                          contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        ),
+                        items: [
+                          const DropdownMenuItem(value: null, child: Text('All Sem')),
+                          ...List.generate(8, (i) => DropdownMenuItem(value: i + 1, child: Text('Sem ${i + 1}'))),
+                        ],
+                        onChanged: (v) => setState(() => _selectedSemester = v),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
 

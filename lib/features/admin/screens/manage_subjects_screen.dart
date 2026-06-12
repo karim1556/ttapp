@@ -20,6 +20,7 @@ class _ManageSubjectsScreenState extends ConsumerState<ManageSubjectsScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
   int? _selectedSemester;
+  int? _selectedBranch;
 
   @override
   void initState() {
@@ -49,7 +50,9 @@ class _ManageSubjectsScreenState extends ConsumerState<ManageSubjectsScreen> {
           s.subjectCode.toLowerCase().contains(q);
       final matchesSem = _selectedSemester == null ||
           s.semester == _selectedSemester;
-      return matchesQuery && matchesSem;
+      final matchesBranch = _selectedBranch == null ||
+          s.branchId == _selectedBranch;
+      return matchesQuery && matchesSem && matchesBranch;
     }).toList();
 
     return Scaffold(
@@ -69,26 +72,59 @@ class _ManageSubjectsScreenState extends ConsumerState<ManageSubjectsScreen> {
       ),
       body: Column(
         children: [
-          // Search + filter row
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: const InputDecoration(
-                      hintText: 'Search by name or code...',
-                      prefixIcon: Icon(Icons.search_outlined),
-                    ),
-                    onChanged: (v) => setState(() => _searchQuery = v),
-                  ),
+          // Search + filter card
+          Container(
+            margin: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
                 ),
-                const SizedBox(width: 8),
-                _SemesterFilterChip(
-                  selected: _selectedSemester,
-                  onChanged: (sem) =>
-                      setState(() => _selectedSemester = sem),
+              ],
+            ),
+            child: Column(
+              children: [
+                TextField(
+                  controller: _searchController,
+                  decoration: const InputDecoration(
+                    hintText: 'Search by name or code...',
+                    prefixIcon: Icon(Icons.search_outlined),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  ),
+                  onChanged: (v) => setState(() => _searchQuery = v),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<int?>(
+                        value: _selectedBranch,
+                        decoration: const InputDecoration(
+                          labelText: 'Department',
+                          contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: null, child: Text('All Dept')),
+                          DropdownMenuItem(value: 1, child: Text('CS')),
+                          DropdownMenuItem(value: 2, child: Text('IT')),
+                          DropdownMenuItem(value: 3, child: Text('EXTC')),
+                          DropdownMenuItem(value: 4, child: Text('Mech')),
+                        ],
+                        onChanged: (v) => setState(() => _selectedBranch = v),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _SemesterFilterChip(
+                      selected: _selectedSemester,
+                      onChanged: (sem) =>
+                          setState(() => _selectedSemester = sem),
+                    ),
+                  ],
                 ),
               ],
             ),
