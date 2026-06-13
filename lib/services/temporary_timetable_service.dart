@@ -56,6 +56,13 @@ class TemporaryTimetableService {
     );
   }
 
+  Future<void> updateTemporarySlot(int id, Map<String, dynamic> data) async {
+    await _apiClient.put(
+      '${ApiEndpoints.temporaryTimetable}/$id',
+      data: data,
+    );
+  }
+
   Future<void> deleteTemporarySlot(int id) async {
     await _apiClient.delete(
       '${ApiEndpoints.temporaryTimetable}/$id',

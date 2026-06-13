@@ -126,6 +126,21 @@ class TemporaryTimetableNotifier extends StateNotifier<TemporaryTimetableState> 
     }
   }
 
+  Future<bool> editSlot(int id, Map<String, dynamic> data) async {
+    state = state.copyWith(isSaving: true);
+    try {
+      await _service.updateTemporarySlot(id, data);
+      state = state.copyWith(isSaving: false);
+      return true;
+    } catch (e) {
+      state = state.copyWith(
+        isSaving: false,
+        errorMessage: e.toString(),
+      );
+      return false;
+    }
+  }
+
   Future<Uint8List?> downloadPdf({
     int? branchId,
     int? semester,

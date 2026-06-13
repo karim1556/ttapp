@@ -19,6 +19,9 @@ import '../features/admin/screens/room_reports_screen.dart';
 import '../features/notifications/screens/notifications_screen.dart';
 import '../features/substitutions/screens/substitutions_screen.dart';
 import '../features/admin/screens/manage_temporary_timetable_screen.dart';
+import '../features/admin/screens/room_timetable_screen.dart';
+import '../features/admin/screens/lab_timetable_screen.dart';
+import '../features/admin/screens/teacher_timetable_screen.dart';
 import '../widgets/app_shell.dart';
 
 // Route names
@@ -41,6 +44,9 @@ class AppRoutes {
   static const String substitutions = '/substitutions';
   static const String notifications = '/notifications';
   static const String manageTemporaryTimetable = '/admin/temporary-timetable';
+  static const String roomTimetable = '/admin/room-timetable';
+  static const String labTimetable = '/admin/lab-timetable';
+  static const String teacherTimetable = '/admin/teacher-timetable';
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -156,6 +162,18 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.manageTemporaryTimetable,
         builder: (context, state) => const ManageTemporaryTimetableScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.roomTimetable,
+        builder: (context, state) => const RoomTimetableScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.labTimetable,
+        builder: (context, state) => const LabTimetableScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.teacherTimetable,
+        builder: (context, state) => const TeacherTimetableScreen(),
       ),
     ],
     errorBuilder: (context, state) =>

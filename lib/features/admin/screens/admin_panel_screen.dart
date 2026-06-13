@@ -176,6 +176,27 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen> {
                   color: Colors.deepOrange,
                   onTap: () => context.push(AppRoutes.manageTemporaryTimetable),
                 ),
+                _AdminActionTile(
+                  icon: Icons.meeting_room_outlined,
+                  title: 'Room TT',
+                  subtitle: 'Per-room weekly view',
+                  color: const Color(0xFF00897B),
+                  onTap: () => context.push(AppRoutes.roomTimetable),
+                ),
+                _AdminActionTile(
+                  icon: Icons.computer_outlined,
+                  title: 'Lab TT',
+                  subtitle: 'Per-lab weekly view',
+                  color: const Color(0xFF5E35B1),
+                  onTap: () => context.push(AppRoutes.labTimetable),
+                ),
+                _AdminActionTile(
+                  icon: Icons.person_pin_outlined,
+                  title: 'Teacher TT',
+                  subtitle: 'Per-teacher schedule',
+                  color: const Color(0xFFD84315),
+                  onTap: () => context.push(AppRoutes.teacherTimetable),
+                ),
               ],
             ),
 
@@ -429,11 +450,9 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen> {
       }
     }
 
-    var timeslots = ref.read(timeslotProvider).timeslots;
-    if (timeslots.isEmpty) {
-      await ref.read(timeslotProvider.notifier).loadTimeslots();
-      timeslots = ref.read(timeslotProvider).timeslots;
-    }
+    // Load timeslots matching the target branch to ensure we check the correct active slots
+    await ref.read(timeslotProvider.notifier).loadTimeslots(branchId: branchId);
+    final timeslots = ref.read(timeslotProvider).timeslots;
     final activeTeachingSlots = timeslots.where((s) => s.active && !s.breakSlot).toList();
     if (activeTeachingSlots.isEmpty) {
       issues.add(

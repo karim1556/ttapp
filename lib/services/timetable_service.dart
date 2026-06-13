@@ -174,6 +174,8 @@ class TimetableService {
     required String division,
     required String academicYear,
     bool force = false,
+    bool enforceLabRooms = true,
+    bool fillCompact = true,
   }) async {
     final response = await _apiClient.post(
       ApiEndpoints.timetableGenerate,
@@ -183,6 +185,8 @@ class TimetableService {
         'division': division,
         'academicYear': academicYear,
         if (force) 'force': true,
+        'enforceLabRooms': enforceLabRooms,
+        'fillCompact': fillCompact,
       },
     );
     return response.data as Map<String, dynamic>;
@@ -196,6 +200,8 @@ class TimetableService {
     List<int>? semesters,
     String? termType,
     bool force = false,
+    bool enforceLabRooms = true,
+    bool fillCompact = true,
   }) async {
     final response = await _apiClient.post(
       ApiEndpoints.timetableGenerateAll,
@@ -206,6 +212,8 @@ class TimetableService {
         if (semesters != null && semesters.isNotEmpty) 'semesters': semesters,
         if (termType != null && termType.isNotEmpty) 'termType': termType,
         if (force) 'force': true,
+        'enforceLabRooms': enforceLabRooms,
+        'fillCompact': fillCompact,
       },
     );
     return response.data as Map<String, dynamic>;

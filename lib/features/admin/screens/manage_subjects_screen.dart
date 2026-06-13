@@ -4,6 +4,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../models/subject_model.dart';
 import '../../../providers/subject_provider.dart';
 import '../../../providers/faculty_provider.dart';
+import '../../../providers/room_provider.dart';
 import '../../../widgets/empty_state_widget.dart';
 import '../../../widgets/loading_overlay_widget.dart';
 import '../../../core/utils/academic_year.dart';
@@ -28,6 +29,7 @@ class _ManageSubjectsScreenState extends ConsumerState<ManageSubjectsScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(subjectProvider.notifier).loadSubjects();
       ref.read(facultyProvider.notifier).loadFaculty();
+      ref.read(roomProvider.notifier).loadRooms();
     });
   }
 
@@ -206,6 +208,7 @@ class _ManageSubjectsScreenState extends ConsumerState<ManageSubjectsScreen> {
     // Professor assignment - use faculty list
     final facultyList = ref.read(facultyProvider).faculty;
     String? professorAssign = existing?.professorAssign;
+    String? preferredRoom = existing?.preferredRoomNumber;
 
     // Batch-wise professor assignments for lab subjects (A, B, C)
     final batchProfessors = <String, String?>{'A': null, 'B': null, 'C': null};
@@ -338,6 +341,44 @@ class _ManageSubjectsScreenState extends ConsumerState<ManageSubjectsScreen> {
                       onChanged: (v) =>
                           setDialogState(() => professorAssign = v),
                     ),
+
+                    // Lab/Practical preferred room binding
+                    if (isPractical) ...[
+                      const SizedBox(height: 12),
+                      Builder(builder: (ctx) {
+                        final labRooms = ref
+                            .read(roomProvider)
+                            .rooms
+                            .where((r) => r.active && r.roomType == 'Lab')
+                            .toList();
+                        return DropdownButtonFormField<String>(
+                          value: preferredRoom,
+                          decoration: InputDecoration(
+                            labelText: 'Preferred Lab Room',
+                            hintText: 'Room exclusively used for this subject',
+                            prefixIcon: const Icon(Icons.science_outlined, size: 18),
+                            helperText:
+                                'Algorithm will only assign this subject to this lab',
+                          ),
+                          isExpanded: true,
+                          items: [
+                            const DropdownMenuItem<String>(
+                              value: null,
+                              child: Text('-- Any Available Room --',
+                                  style: TextStyle(color: Colors.grey)),
+                            ),
+                            ...labRooms.map((r) => DropdownMenuItem<String>(
+                                  value: r.roomNumber,
+                                  child: Text(
+                                    '${r.roomNumber}${r.name != null && r.name!.isNotEmpty ? ' (${r.name})' : ''}',
+                                  ),
+                                )),
+                          ],
+                          onChanged: (v) =>
+                              setDialogState(() => preferredRoom = v),
+                        );
+                      }),
+                    ],
 
                     // Batch-wise professor assignment for lab subjects
                     if (isPractical) ...[
@@ -559,6 +600,9 @@ class _ManageSubjectsScreenState extends ConsumerState<ManageSubjectsScreen> {
                     'theory': theoryCtrl.text.trim(),
                   if (experimentsCtrl.text.trim().isNotEmpty)
                     'experiments': experimentsCtrl.text.trim(),
+                  // Preferred lab room binding
+                  if (isPractical && preferredRoom != null)
+                    'preferred_room': preferredRoom,
                   // Send batch-wise professor assignments for lab subjects
                   if (isPractical)
                     'batchProfessors': {

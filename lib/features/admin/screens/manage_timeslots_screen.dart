@@ -547,7 +547,7 @@ class _TimeslotFormDialogState extends State<_TimeslotFormDialog> {
   @override
   Widget build(BuildContext context) {
     final hours = List.generate(24, (i) => i);
-    final minutes = [0, 15, 30, 45];
+    final minutes = List.generate(60, (i) => i);
 
     return AlertDialog(
       title: Text(widget.slot == null ? 'Add Time Slot' : 'Edit Time Slot'),

@@ -6,5 +6,13 @@ String currentAcademicYear({DateTime? now}) {
 }
 
 List<String> academicYearOptions({DateTime? now}) {
-  return [currentAcademicYear(now: now)];
+  final date = now ?? DateTime.now();
+  final year = date.year;
+  final start = date.month >= 6 ? year : year - 1;
+  return List.generate(5, (i) {
+    final from = start - i;
+    final to = (from + 1) % 100;
+    return '$from-${to.toString().padLeft(2, '0')}';
+  });
 }
+

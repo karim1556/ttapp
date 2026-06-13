@@ -305,6 +305,7 @@ class _ManageTemporaryTimetableScreenState
                             return _TemporarySlotCard(
                               slot: slot,
                               onDelete: () => _confirmDelete(context, slot),
+                              onEdit: () => _confirmEdit(context, slot),
                             );
                           },
                         ),
@@ -387,6 +388,25 @@ class _ManageTemporaryTimetableScreenState
       }
     }
   }
+
+  Future<void> _confirmEdit(BuildContext context, TemporaryTimeSlot slot) async {
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (_) => _EditSlotDialog(slot: slot),
+    );
+    if (result == null || !mounted) return;
+    final success =
+        await ref.read(temporaryTimetableProvider.notifier).editSlot(slot.id, result);
+    if (success && mounted) {
+      _loadSlots();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✅ Slot updated successfully!'),
+          backgroundColor: Color(0xFF2E7D32),
+        ),
+      );
+    }
+  }
 }
 
 // ─────────────────────────────────────────────────────────
@@ -439,10 +459,12 @@ class _FilterDropdown<T> extends StatelessWidget {
 class _TemporarySlotCard extends ConsumerWidget {
   final TemporaryTimeSlot slot;
   final VoidCallback onDelete;
+  final VoidCallback onEdit;
 
   const _TemporarySlotCard({
     required this.slot,
     required this.onDelete,
+    required this.onEdit,
   });
 
   @override
@@ -587,9 +609,16 @@ class _TemporarySlotCard extends ConsumerWidget {
               ),
             ),
             IconButton(
+              icon: const Icon(Icons.edit_outlined,
+                  color: AppColors.primary, size: 20),
+              onPressed: onEdit,
+              tooltip: 'Edit',
+            ),
+            IconButton(
               icon: const Icon(Icons.delete_outline_rounded,
                   color: AppColors.error, size: 20),
               onPressed: onDelete,
+              tooltip: 'Delete',
             ),
           ],
         ),
@@ -1363,6 +1392,274 @@ class _DatePickerTile extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+// Edit Slot Dialog
+// ─────────────────────────────────────────────────────────
+class _EditSlotDialog extends ConsumerStatefulWidget {
+  final TemporaryTimeSlot slot;
+
+  const _EditSlotDialog({required this.slot});
+
+  @override
+  ConsumerState<_EditSlotDialog> createState() => _EditSlotDialogState();
+}
+
+class _EditSlotDialogState extends ConsumerState<_EditSlotDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late DateTime _date;
+  late int _startHr;
+  late int _startMin;
+  late int _endHr;
+  late int _endMin;
+  late TextEditingController _eventNameCtrl;
+  late TextEditingController _descCtrl;
+  late TextEditingController _roomCtrl;
+  late String? _subjectCode;
+  late int? _facultyId;
+  String _type = 'Lecture';
+
+  static const _types = ['Lecture', 'Lab', 'Tutorial', 'Event'];
+
+  @override
+  void initState() {
+    super.initState();
+    final s = widget.slot;
+    _date = s.date;
+    _startHr = s.startTimeHr;
+    _startMin = s.startTimeMinutes;
+    _endHr = s.endTimeHr;
+    _endMin = s.endTimeMinutes;
+    _eventNameCtrl = TextEditingController(text: s.eventName ?? '');
+    _descCtrl = TextEditingController(text: s.description ?? '');
+    _roomCtrl = TextEditingController(text: s.roomNumber ?? '');
+    _subjectCode = s.subjectCode;
+    _facultyId = s.facultyId;
+    _type = s.typeOfLecture ?? 'Lecture';
+  }
+
+  @override
+  void dispose() {
+    _eventNameCtrl.dispose();
+    _descCtrl.dispose();
+    _roomCtrl.dispose();
+    super.dispose();
+  }
+
+  String _fmt(int hr, int min) =>
+      '${hr.toString().padLeft(2, '0')}:${min.toString().padLeft(2, '0')}';
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _date,
+      firstDate: DateTime.now().subtract(const Duration(days: 30)),
+      lastDate: DateTime.now().add(const Duration(days: 180)),
+    );
+    if (picked != null) setState(() => _date = picked);
+  }
+
+  Future<void> _pickTime(bool isStart) async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(
+        hour: isStart ? _startHr : _endHr,
+        minute: isStart ? _startMin : _endMin,
+      ),
+    );
+    if (picked != null) {
+      setState(() {
+        if (isStart) {
+          _startHr = picked.hour;
+          _startMin = picked.minute;
+        } else {
+          _endHr = picked.hour;
+          _endMin = picked.minute;
+        }
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final facultyList = ref.watch(facultyProvider).faculty;
+    final subjectList = ref.watch(subjectProvider).subjects;
+
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: const Text('Edit Slot',
+          style: TextStyle(fontWeight: FontWeight.w700)),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Date
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.calendar_today_outlined,
+                      color: AppColors.primary),
+                  title: Text(
+                    DateFormat('EEE, MMM d, yyyy').format(_date),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w600, fontSize: 14),
+                  ),
+                  subtitle: const Text('Tap to change date'),
+                  onTap: _pickDate,
+                ),
+                const Divider(),
+
+                // Time row
+                Row(
+                  children: [
+                    Expanded(
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.schedule_outlined,
+                            color: AppColors.primary, size: 20),
+                        title: Text(_fmt(_startHr, _startMin),
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w600, fontSize: 14)),
+                        subtitle: const Text('Start'),
+                        onTap: () => _pickTime(true),
+                      ),
+                    ),
+                    const Text('→'),
+                    Expanded(
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(_fmt(_endHr, _endMin),
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w600, fontSize: 14)),
+                        subtitle: const Text('End'),
+                        onTap: () => _pickTime(false),
+                      ),
+                    ),
+                  ],
+                ),
+                const Divider(),
+                const SizedBox(height: 8),
+
+                // Type
+                DropdownButtonFormField<String>(
+                  value: _type,
+                  decoration:
+                      const InputDecoration(labelText: 'Lecture Type'),
+                  items: _types
+                      .map((t) =>
+                          DropdownMenuItem(value: t, child: Text(t)))
+                      .toList(),
+                  onChanged: (v) => setState(() => _type = v ?? _type),
+                ),
+                const SizedBox(height: 10),
+
+                // Subject
+                DropdownButtonFormField<String?>(
+                  value: _subjectCode,
+                  isExpanded: true,
+                  decoration:
+                      const InputDecoration(labelText: 'Subject'),
+                  items: [
+                    const DropdownMenuItem<String?>(
+                      value: null,
+                      child: Text('-- Event / No Subject --',
+                          style: TextStyle(color: Colors.grey)),
+                    ),
+                    ...subjectList.map((s) => DropdownMenuItem<String?>(
+                          value: s.subjectCode,
+                          child: Text(
+                            '${s.subjectCode} — ${s.subjectName}',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        )),
+                  ],
+                  onChanged: (v) => setState(() => _subjectCode = v),
+                ),
+                const SizedBox(height: 10),
+
+                // Faculty
+                DropdownButtonFormField<int?>(
+                  value: _facultyId,
+                  isExpanded: true,
+                  decoration:
+                      const InputDecoration(labelText: 'Faculty'),
+                  items: [
+                    const DropdownMenuItem<int?>(
+                        value: null, child: Text('-- None --')),
+                    ...facultyList.map((f) => DropdownMenuItem<int?>(
+                          value: f.facultyId,
+                          child: Text(f.name,
+                              overflow: TextOverflow.ellipsis),
+                        )),
+                  ],
+                  onChanged: (v) => setState(() => _facultyId = v),
+                ),
+                const SizedBox(height: 10),
+
+                // Room
+                TextFormField(
+                  controller: _roomCtrl,
+                  decoration:
+                      const InputDecoration(labelText: 'Room Number'),
+                ),
+                const SizedBox(height: 10),
+
+                // Event name
+                TextFormField(
+                  controller: _eventNameCtrl,
+                  decoration: const InputDecoration(
+                      labelText: 'Event Name (optional)'),
+                ),
+                const SizedBox(height: 10),
+
+                // Description
+                TextFormField(
+                  controller: _descCtrl,
+                  decoration: const InputDecoration(labelText: 'Notes'),
+                  maxLines: 2,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () {
+            Navigator.pop(context, {
+              'date': DateFormat('yyyy-MM-dd').format(_date),
+              'startTimeHr': _startHr,
+              'startTimeMinutes': _startMin,
+              'endTimeHr': _endHr,
+              'endTimeMinutes': _endMin,
+              'typeOfLecture': _type,
+              'subjectCode': _subjectCode,
+              'facultyid': _facultyId,
+              'room_number': _roomCtrl.text.trim().isNotEmpty
+                  ? _roomCtrl.text.trim()
+                  : null,
+              'eventName': _eventNameCtrl.text.trim().isNotEmpty
+                  ? _eventNameCtrl.text.trim()
+                  : null,
+              'description': _descCtrl.text.trim().isNotEmpty
+                  ? _descCtrl.text.trim()
+                  : null,
+            });
+          },
+          child: const Text('Save Changes'),
+        ),
+      ],
     );
   }
 }

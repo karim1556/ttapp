@@ -15,11 +15,13 @@ class SubjectModel {
   final int? weeklyHours;
   final int? semesterHours;
   final int? maxMarks;
-  final int? isOral;
   final int? isPractical;
+  final int? isOral;
   final int? oralMarks;
   final int? practicalMarks;
   final int? passingMarks;
+  /// For lab subjects: the specific room number this subject must use during generation.
+  final String? preferredRoomNumber;
 
   SubjectModel({
     required this.id,
@@ -44,6 +46,7 @@ class SubjectModel {
     this.oralMarks,
     this.practicalMarks,
     this.passingMarks,
+    this.preferredRoomNumber,
   });
 
   /// totalCredits = lectures per week
@@ -76,6 +79,7 @@ class SubjectModel {
       oralMarks: _parseInt(json['oral_marks']) ?? _parseInt(json['oralMarks']),
       practicalMarks: _parseInt(json['practical_marks']) ?? _parseInt(json['practicalMarks']),
       passingMarks: _parseInt(json['passing_marks']) ?? _parseInt(json['passingMarks']),
+      preferredRoomNumber: json['preferred_room']?.toString() ?? json['preferredRoom']?.toString(),
     );
   }
 
@@ -102,6 +106,7 @@ class SubjectModel {
       'oral_marks': oralMarks,
       'practical_marks': practicalMarks,
       'passing_marks': passingMarks,
+      'preferred_room': preferredRoomNumber,
     };
   }
 
