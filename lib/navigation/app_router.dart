@@ -22,6 +22,7 @@ import '../features/admin/screens/manage_temporary_timetable_screen.dart';
 import '../features/admin/screens/room_timetable_screen.dart';
 import '../features/admin/screens/lab_timetable_screen.dart';
 import '../features/admin/screens/teacher_timetable_screen.dart';
+import '../features/admin/screens/manual_edit_timetable_screen.dart';
 import '../widgets/app_shell.dart';
 
 // Route names
@@ -47,6 +48,7 @@ class AppRoutes {
   static const String roomTimetable = '/admin/room-timetable';
   static const String labTimetable = '/admin/lab-timetable';
   static const String teacherTimetable = '/admin/teacher-timetable';
+  static const String manualEditTimetable = '/admin/manual-edit';
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -174,6 +176,18 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.teacherTimetable,
         builder: (context, state) => const TeacherTimetableScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.manualEditTimetable,
+        builder: (context, state) {
+          final isAdmin = ref.read(isAdminProvider);
+          if (!isAdmin) {
+            return const Scaffold(
+              body: Center(child: Text('Access denied')),
+            );
+          }
+          return const ManualEditTimetableScreen();
+        },
       ),
     ],
     errorBuilder: (context, state) =>

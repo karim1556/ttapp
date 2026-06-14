@@ -135,6 +135,13 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen> {
                   onTap: () => context.go(AppRoutes.timetable),
                 ),
                 _AdminActionTile(
+                  icon: Icons.edit_note_outlined,
+                  title: 'Manual Edit',
+                  subtitle: 'Switch & adjust slots',
+                  color: Colors.deepPurple,
+                  onTap: () => context.push(AppRoutes.manualEditTimetable),
+                ),
+                _AdminActionTile(
                   icon: Icons.swap_horiz_rounded,
                   title: 'Substitutions',
                   subtitle: 'Day-only replacements',
