@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../navigation/app_router.dart';
 import '../../../providers/auth_provider.dart';
-import '../../../providers/constraint_provider.dart';
 import '../../../providers/faculty_provider.dart';
 import '../../../providers/subject_provider.dart';
 import '../../../providers/timetable_provider.dart';

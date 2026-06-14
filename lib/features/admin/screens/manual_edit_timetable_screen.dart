@@ -249,7 +249,7 @@ class _ManualEditTimetableScreenState extends ConsumerState<ManualEditTimetableS
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: dayData.slots.length,
-                separatorBuilder: (_, __) => Divider(height: 1, color: Colors.grey.shade100),
+                separatorBuilder: (context, index) => Divider(height: 1, color: Colors.grey.shade100),
                 itemBuilder: (context, sIdx) {
                   final slot = dayData.slots[sIdx];
                   final hasLecture = slot.lectures.isNotEmpty;
