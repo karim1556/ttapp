@@ -64,148 +64,224 @@ class _ManualEditTimetableScreenState extends ConsumerState<ManualEditTimetableS
           ),
         ],
       ),
-      body: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Sidebar Filter Panel
-          Container(
-            width: 320,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isMobile = constraints.maxWidth < 720;
+
+          final filterWidget = Container(
+            width: isMobile ? double.infinity : 320,
             decoration: BoxDecoration(
               color: Colors.white,
-              border: Border(right: BorderSide(color: Colors.grey.shade200)),
+              border: isMobile
+                  ? Border(bottom: BorderSide(color: Colors.grey.shade200))
+                  : Border(right: BorderSide(color: Colors.grey.shade200)),
             ),
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
+            padding: const EdgeInsets.all(16),
+            child: isMobile
+                ? ExpansionTile(
+                    leading: const Icon(Icons.tune_rounded, color: AppColors.primary),
+                    title: const Text(
+                      'Class Filters',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textPrimary),
+                    ),
+                    initiallyExpanded: !isTimetableLoaded,
+                    childrenPadding: const EdgeInsets.symmetric(vertical: 8),
+                    children: [
+                      DropdownButtonFormField<String>(
+                        value: _selectedAcadYear,
+                        decoration: const InputDecoration(labelText: 'Academic Year', prefixIcon: Icon(Icons.calendar_today_outlined, size: 18)),
+                        items: academicYearOptions().map((y) => DropdownMenuItem(value: y, child: Text(y))).toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() => _selectedAcadYear = val);
+                            _loadTimetable();
+                          }
+                        },
                       ),
-                      child: const Icon(Icons.tune_rounded, color: AppColors.primary, size: 20),
-                    ),
-                    const SizedBox(width: 12),
-                    const Text(
-                      'Select Class',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                DropdownButtonFormField<String>(
-                  value: _selectedAcadYear,
-                  decoration: const InputDecoration(labelText: 'Academic Year', prefixIcon: Icon(Icons.calendar_today_outlined, size: 18)),
-                  items: academicYearOptions().map((y) => DropdownMenuItem(value: y, child: Text(y))).toList(),
-                  onChanged: (val) {
-                    if (val != null) {
-                      setState(() => _selectedAcadYear = val);
-                      _loadTimetable();
-                    }
-                  },
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<int>(
-                  value: _selectedBranch,
-                  decoration: const InputDecoration(labelText: 'Branch', prefixIcon: Icon(Icons.lan_outlined, size: 18)),
-                  items: _branches.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))).toList(),
-                  onChanged: (val) {
-                    setState(() => _selectedBranch = val);
-                    _loadTimetable();
-                  },
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<int>(
-                  value: _selectedSemester,
-                  decoration: const InputDecoration(labelText: 'Semester', prefixIcon: Icon(Icons.school_outlined, size: 18)),
-                  items: _semesters.map((s) => DropdownMenuItem(value: s, child: Text('Sem $s'))).toList(),
-                  onChanged: (val) {
-                    setState(() => _selectedSemester = val);
-                    _loadTimetable();
-                  },
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  value: _selectedDivision,
-                  decoration: const InputDecoration(labelText: 'Division', prefixIcon: Icon(Icons.grid_view_rounded, size: 18)),
-                  items: _divisions.map((d) => DropdownMenuItem(value: d, child: Text('Div $d'))).toList(),
-                  onChanged: (val) {
-                    setState(() => _selectedDivision = val);
-                    _loadTimetable();
-                  },
-                ),
-                const Spacer(),
-                if (isLoading)
-                  const Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        CircularProgressIndicator(),
-                        SizedBox(height: 12),
-                        Text('Updating database...', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
-                      ],
-                    ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<int>(
+                        value: _selectedBranch,
+                        decoration: const InputDecoration(labelText: 'Branch', prefixIcon: Icon(Icons.lan_outlined, size: 18)),
+                        items: _branches.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))).toList(),
+                        onChanged: (val) {
+                          setState(() => _selectedBranch = val);
+                          _loadTimetable();
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<int>(
+                        value: _selectedSemester,
+                        decoration: const InputDecoration(labelText: 'Semester', prefixIcon: Icon(Icons.school_outlined, size: 18)),
+                        items: _semesters.map((s) => DropdownMenuItem(value: s, child: Text('Sem $s'))).toList(),
+                        onChanged: (val) {
+                          setState(() => _selectedSemester = val);
+                          _loadTimetable();
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        value: _selectedDivision,
+                        decoration: const InputDecoration(labelText: 'Division', prefixIcon: Icon(Icons.grid_view_rounded, size: 18)),
+                        items: _divisions.map((d) => DropdownMenuItem(value: d, child: Text('Div $d'))).toList(),
+                        onChanged: (val) {
+                          setState(() => _selectedDivision = val);
+                          _loadTimetable();
+                        },
+                      ),
+                    ],
                   )
-                else
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.info_outline, color: Colors.blue.shade700, size: 18),
-                        const SizedBox(width: 8),
-                        const Expanded(
-                          child: Text(
-                            'Click Switch on any lecture to relocate or swap it with another slot across any weekday.',
-                            style: TextStyle(fontSize: 11, height: 1.3, color: Colors.blueGrey),
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(Icons.tune_rounded, color: AppColors.primary, size: 20),
+                          ),
+                          const SizedBox(width: 12),
+                          const Text(
+                            'Select Class',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+                      DropdownButtonFormField<String>(
+                        value: _selectedAcadYear,
+                        decoration: const InputDecoration(labelText: 'Academic Year', prefixIcon: Icon(Icons.calendar_today_outlined, size: 18)),
+                        items: academicYearOptions().map((y) => DropdownMenuItem(value: y, child: Text(y))).toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() => _selectedAcadYear = val);
+                            _loadTimetable();
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      DropdownButtonFormField<int>(
+                        value: _selectedBranch,
+                        decoration: const InputDecoration(labelText: 'Branch', prefixIcon: Icon(Icons.lan_outlined, size: 18)),
+                        items: _branches.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))).toList(),
+                        onChanged: (val) {
+                          setState(() => _selectedBranch = val);
+                          _loadTimetable();
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      DropdownButtonFormField<int>(
+                        value: _selectedSemester,
+                        decoration: const InputDecoration(labelText: 'Semester', prefixIcon: Icon(Icons.school_outlined, size: 18)),
+                        items: _semesters.map((s) => DropdownMenuItem(value: s, child: Text('Sem $s'))).toList(),
+                        onChanged: (val) {
+                          setState(() => _selectedSemester = val);
+                          _loadTimetable();
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      DropdownButtonFormField<String>(
+                        value: _selectedDivision,
+                        decoration: const InputDecoration(labelText: 'Division', prefixIcon: Icon(Icons.grid_view_rounded, size: 18)),
+                        items: _divisions.map((d) => DropdownMenuItem(value: d, child: Text('Div $d'))).toList(),
+                        onChanged: (val) {
+                          setState(() => _selectedDivision = val);
+                          _loadTimetable();
+                        },
+                      ),
+                      const Spacer(),
+                      if (isLoading)
+                        const Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              CircularProgressIndicator(),
+                              SizedBox(height: 12),
+                              Text('Updating database...', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                            ],
+                          ),
+                        )
+                      else
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.info_outline, color: Colors.blue.shade700, size: 18),
+                              const SizedBox(width: 8),
+                              const Expanded(
+                                child: Text(
+                                  'Click Switch on any lecture to relocate or swap it with another slot across any weekday.',
+                                  style: TextStyle(fontSize: 11, height: 1.3, color: Colors.blueGrey),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
+                    ],
                   ),
-              ],
-            ),
-          ),
+          );
 
-          // Main Editor View
-          Expanded(
-            child: isLoading && !isTimetableLoaded
-                ? const Center(child: CircularProgressIndicator())
-                : !isTimetableLoaded
-                    ? Center(
+          final mainView = isLoading && !isTimetableLoaded
+              ? const Center(child: CircularProgressIndicator())
+              : !isTimetableLoaded
+                  ? Center(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.symmetric(vertical: 40),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(Icons.edit_calendar_rounded, size: 80, color: Colors.grey.shade300),
                             const SizedBox(height: 16),
                             const Text(
-                              'Select Branch, Semester & Division to load timetable',
+                              'Select Branch, Semester & Division\nto load timetable',
+                              textAlign: TextAlign.center,
                               style: TextStyle(fontSize: 16, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
                             ),
                           ],
                         ),
-                      )
-                    : _buildWeeklyGrid(timetableState.weeklyTimetable),
-          ),
-        ],
+                      ),
+                    )
+                  : _buildWeeklyGrid(timetableState.weeklyTimetable);
+
+          return isMobile
+              ? Column(
+                  children: [
+                    filterWidget,
+                    if (isLoading && isTimetableLoaded)
+                      const LinearProgressIndicator(color: AppColors.primary),
+                    Expanded(child: mainView),
+                  ],
+                )
+              : Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    filterWidget,
+                    Expanded(child: mainView),
+                  ],
+                );
+        },
       ),
     );
   }
 
   Widget _buildWeeklyGrid(List<TimetableDay> weekly) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 720;
+
     return ListView.builder(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(isMobile ? 12 : 24),
       itemCount: weekly.length,
       itemBuilder: (context, index) {
         final dayData = weekly[index];
         return Card(
-          margin: const EdgeInsets.only(bottom: 24),
+          margin: EdgeInsets.only(bottom: isMobile ? 16 : 24),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
           clipBehavior: Clip.antiAlias,
           elevation: 2,
@@ -255,19 +331,20 @@ class _ManualEditTimetableScreenState extends ConsumerState<ManualEditTimetableS
                   final hasLecture = slot.lectures.isNotEmpty;
 
                   return Container(
-                    padding: const EdgeInsets.all(16),
+                    padding: EdgeInsets.all(isMobile ? 12 : 16),
                     color: hasLecture ? Colors.white : const Color(0xFFFAF9F6),
                     child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Time column
                         SizedBox(
-                          width: 120,
+                          width: isMobile ? 80 : 120,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 slot.startTimeDisplay,
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textPrimary),
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: isMobile ? 14 : 16, color: AppColors.textPrimary),
                               ),
                               Text(
                                 'to ${slot.endTimeDisplay}',
@@ -276,6 +353,7 @@ class _ManualEditTimetableScreenState extends ConsumerState<ManualEditTimetableS
                             ],
                           ),
                         ),
+                        const SizedBox(width: 8),
                         // Lecture contents
                         Expanded(
                           child: hasLecture
@@ -304,94 +382,117 @@ class _ManualEditTimetableScreenState extends ConsumerState<ManualEditTimetableS
   }
 
   Widget _buildLecturesSection(TimeSlotModel slot, String dayName, List<TimetableDay> weekly) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 720;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: slot.lectures.map((lec) {
         final isLab = lec.isLabLecture;
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          lec.subjectName ?? lec.subjectCode ?? 'No Subject',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.textPrimary),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: isLab ? AppColors.labBackground : AppColors.primary.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            isLab ? 'Lab' : 'Lecture',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: isLab ? AppColors.labText : AppColors.primary,
-                            ),
-                          ),
-                        ),
-                        if (lec.batch != null && lec.batch!.isNotEmpty) ...[
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.shade50,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              'Batch ${lec.batch}',
-                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.orange.shade800),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Wrap(
-                      spacing: 16,
-                      children: [
-                        _infoRow(Icons.person_outline, lec.facultyName ?? 'Unassigned'),
-                        _infoRow(Icons.room_outlined, lec.roomNumber != null ? 'Room ${lec.roomNumber}' : 'No Room'),
-                      ],
-                    ),
-                  ],
+
+        final detailsColumn = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    lec.subjectName ?? lec.subjectCode ?? 'No Subject',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: isMobile ? 14 : 15, color: AppColors.textPrimary),
+                  ),
                 ),
-              ),
-              // Action buttons (Edit & Switch)
-              Row(
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: () => _showEditDialog(lec),
-                    icon: const Icon(Icons.edit_outlined, size: 14),
-                    label: const Text('Edit'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.primary,
-                      side: const BorderSide(color: AppColors.primary),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: isLab ? AppColors.labBackground : AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    isLab ? 'Lab' : 'Lecture',
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                      color: isLab ? AppColors.labText : AppColors.primary,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  OutlinedButton.icon(
-                    onPressed: () => _showSwitchDialog(lec, dayName, slot, weekly),
-                    icon: const Icon(Icons.swap_horiz_rounded, size: 14),
-                    label: const Text('Switch'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.deepPurple,
-                      side: const BorderSide(color: Colors.deepPurple),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                ),
+                if (lec.batch != null && lec.batch!.isNotEmpty) ...[
+                  const SizedBox(width: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'B-${lec.batch}',
+                      style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.orange.shade800),
                     ),
                   ),
                 ],
+              ],
+            ),
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 12,
+              runSpacing: 4,
+              children: [
+                _infoRow(Icons.person_outline, lec.facultyName ?? 'Unassigned'),
+                _infoRow(Icons.room_outlined, lec.roomNumber != null ? 'Room ${lec.roomNumber}' : 'No Room'),
+              ],
+            ),
+          ],
+        );
+
+        final actionButtons = Row(
+          mainAxisAlignment: isMobile ? MainAxisAlignment.end : MainAxisAlignment.start,
+          children: [
+            OutlinedButton.icon(
+              onPressed: () => _showEditDialog(lec),
+              icon: const Icon(Icons.edit_outlined, size: 12),
+              label: const Text('Edit', style: TextStyle(fontSize: 11)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                side: const BorderSide(color: AppColors.primary),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               ),
-            ],
+            ),
+            const SizedBox(width: 6),
+            OutlinedButton.icon(
+              onPressed: () => _showSwitchDialog(lec, dayName, slot, weekly),
+              icon: const Icon(Icons.swap_horiz_rounded, size: 12),
+              label: const Text('Switch', style: TextStyle(fontSize: 11)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.deepPurple,
+                side: const BorderSide(color: Colors.deepPurple),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              ),
+            ),
+          ],
+        );
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Container(
+            padding: EdgeInsets.symmetric(vertical: isMobile ? 6 : 4),
+            child: isMobile
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      detailsColumn,
+                      const SizedBox(height: 8),
+                      actionButtons,
+                    ],
+                  )
+                : Row(
+                    children: [
+                      Expanded(child: detailsColumn),
+                      const SizedBox(width: 12),
+                      actionButtons,
+                    ],
+                  ),
           ),
         );
       }).toList(),
